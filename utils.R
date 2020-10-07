@@ -65,7 +65,7 @@ utils.attach.fires <- function(m, f, radius_km=100){
   return(mf)
 }
 
-utils.trajs_at_date <- function(date, lat, lon){
+utils.trajs_at_date <- function(date, lat, lon, met_type, duration_hour, height){
   tryCatch({
     trajs <- splitr::hysplit_trajectory(
       lon = lon,
@@ -100,7 +100,7 @@ utils.trajs_at_date <- function(date, lat, lon){
 }
 
 
-utils.attach.trajs <- function(mf){
+utils.attach.trajs <- function(mf, met_type, duration_hour, height){
 
   mft <- mf %>%
     rowwise() %>%
@@ -108,12 +108,14 @@ utils.attach.trajs <- function(mf){
       lat=st_coordinates(geometry)[2],
       lon=st_coordinates(geometry)[1])
 
-  trajs <- pbmcapply::pbmcmapply(utils.trajs_at_date,
+  trajs <- mapply(utils.trajs_at_date,
                   mft$date,
                   mft$lat,
                   mft$lon,
-                  SIMPLIFY = F,
-                  mc.cores = parallel::detectCores()-1)
+                  met_type,
+                  duration_hour,
+                  height,
+                  SIMPLIFY = F)
 
   mft$trajs=trajs
   mft$lat = NULL
