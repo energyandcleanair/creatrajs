@@ -41,7 +41,7 @@ mftb.plotted <- mftb %>%
                         country, region_id, paste0(radius_km,"km"), gsub(".","",met_type), sep=".")
 ) %>%
   ungroup() %>%
-  mutate(plot=purrr::pmap_chr(., map.trajs, powerplants=powerplants),
+  mutate(plot=purrr::pmap_chr(., map.trajs, powerplants=powerplants, met_type=met_type),
          meta=purrr::pmap_chr(., utils.save.meta))
 
 
