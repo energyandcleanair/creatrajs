@@ -14,7 +14,7 @@ source('./utils.R')
 source('./plots.R')
 
 # cities <- c("pune","jaipur", "hyderabad","mumbai","varanasi","bengaluru","bangalore","Ahmedabad","chennai","kolkata")
-cities <- c("mumbai","varanasi","bengaluru","bangalore","Ahmedabad","chennai","kolkata")
+# cities <- c("mumbai","varanasi","bengaluru","bangalore","Ahmedabad","chennai","kolkata")
 cities <- "delhi"
 
 m <- bind_rows(
@@ -38,7 +38,7 @@ mftb <- mft %>% utils.attach.basemaps(radius_km=radius_km, zoom_level=7)
 mftb.plotted <- mftb %>%
   rowwise() %>%
   mutate(filename=paste("map.trajs-fire-power",gsub("-","",date),
-                        country, region_id, paste0(radius_km,"km"), gsub(".","",met_type), sep=".")
+                        country, region_id, paste0(radius_km,"km"), gsub("\\.","",met_type), sep=".")
 ) %>%
   ungroup() %>%
   mutate(plot=purrr::pmap_chr(., map.trajs, powerplants=powerplants),
