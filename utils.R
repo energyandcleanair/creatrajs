@@ -78,7 +78,7 @@ utils.trajs_at_date <- function(date, lat, lon, met_type, duration_hour, height)
       met_type = met_type,
       extended_met = F,
       met_dir = dir_hysplit_met,
-      exec_dir = here::here(dir_hysplit_output),
+      exec_dir = dir_hysplit_output,
       clean_up = F
     )
 
