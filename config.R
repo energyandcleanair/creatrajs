@@ -6,7 +6,7 @@
 duration_hour <- 72 # Liu 2018
 radius_km <- 200
 height <- 500 # Liu 2018. Should be improved by considering PBL pre/post monsoon
-met_type <- "gfs0.25"
+met_type <- "gdas0.5"
 
 ggmap::register_google("AIzaSyAM2hj3VbXCSjAXIjLjLH_DfPPSiV8Bhg0")
 
