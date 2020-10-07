@@ -71,7 +71,7 @@ utils.trajs_at_date <- function(date, lat, lon){
       lon = lon,
       lat = lat,
       height = height,
-      duration = duration,
+      duration = duration_hour,
       days = date,
       daily_hours = c(0, 6, 12, 18),
       direction = "backward",
