@@ -31,7 +31,7 @@ f <- utils.read.fires()
 
 mf <- utils.attach.fires(m, f, radius_km=radius_km)
 
-mft <- utils.attach.trajs(mf)
+mft <- utils.attach.trajs(mf, met_type=met_type, duration_hour=duration_hour, height=height)
 
 mftb <- mft %>% utils.attach.basemaps(radius_km=radius_km, zoom_level=7)
 
