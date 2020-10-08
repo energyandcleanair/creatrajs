@@ -1,12 +1,14 @@
+require(dplyr)
+require(sf)
+require(rcrea)
+require(splitr)
+require(pbmcapply)
+# remove.packages("ggmap")
+# devtools::install_github("dkahle/ggmap") # Needed for bbox and google basemaps to work
+require(ggmap)
+require(fuzzyjoin)
+require(googleCloudStorageR)
 
-
-# References
-# Liu, T., Marlier, M. E., DeFries, R. S., Westervelt, D. M., Xia, K. R., Fiore, A. M., … Milly, G. (2018). Seasonal impact of regional outdoor biomass burning on air pollution in three Indian cities: Delhi, Bengaluru, and Pune. Atmospheric Environment, 172, 83–92. https://doi.org/10.1016/j.atmosenv.2017.10.024
-
-duration_hour <- 72 # Liu 2018
-radius_km <- 200
-height <- 500 # Liu 2018. Should be improved by considering PBL pre/post monsoon
-met_type <- "reanalysis"
 
 ggmap::register_google("AIzaSyAM2hj3VbXCSjAXIjLjLH_DfPPSiV8Bhg0")
 
