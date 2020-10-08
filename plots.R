@@ -1,5 +1,5 @@
 
-map.trajs <- function(basemap, fires, trajs, region_id, source, date, value, unit, filename, powerplants, met_type, ..., add_plot=NULL){
+map.trajs <- function(basemap, fires, trajs, region_id, source, date, value, unit, filename, powerplants, met_type, duration_hour, height, ..., add_plot=NULL){
 
   tryCatch({
     region_name <- tools::toTitleCase(region_id)
@@ -41,7 +41,8 @@ map.trajs <- function(basemap, fires, trajs, region_id, source, date, value, uni
        labs(title=paste0("Sources or air flowing into ", region_name),
             subtitle = subtitle,
             x='', y='',
-            caption=paste0("CREA based on ",source, ", VIIRS and HYSPLIT (",met_type,").\nSize reflects the maximum fire intensity."))
+            caption=paste0("CREA based on ",source, ", VIIRS and HYSPLIT.\nSize reflects the maximum fire intensity.\n",
+                           "HYSPLIT parameters: ", duration_hour,"h | ",met_type," | ",height,"m." ))
 
     if(!is.null(fires) & nrow(fires %>% filter(!is.na(date.fire)))){
 
