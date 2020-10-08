@@ -1,3 +1,10 @@
+utils.buffer_km <- function(g, buffer_km){
+  g %>%
+    st_transform(crs=3857) %>%
+    st_buffer(buffer_km*1000) %>%
+    st_transform(crs=4326)
+}
+
 utils.read.fires <- function(){
   files <- list.files("data","fire_.*.csv", full.names = T)
 
@@ -123,6 +130,48 @@ utils.attach.trajs <- function(mf, met_type, duration_hour, height){
 
   return(mft)
 }
+
+utils.attach.frp <- function(mft, buffer_km){
+
+  frp.read.modis <- function(date){
+    tryCatch({
+      # Using the dat format
+      folder1 <- file.path(dir_modis, "MOD14", lubridate::year(date)) #TERRA
+      folder2 <- file.path(dir_modis, "MYD14", lubridate::year(date)) #AQUA
+      pattern <- paste0("M.D14_006_Fire_Table_",lubridate::year(date), sprintf("%03d", lubridate::yday(date)),".dat")
+      f1 <- list.files(folder1, pattern, full.names = T)
+      f2 <- list.files(folder2, pattern, full.names = T)
+
+      d1 <- read.csv(f1, skip = 6)
+      d2 <- read.csv(f2, skip = 6)
+
+      sf1 <- sf::st_as_sf(d1, coords=c("FP_longitude","FP_latitude"), crs=4326)
+      sf2 <- sf::st_as_sf(d2, coords=c("FP_longitude","FP_latitude"), crs=4326)
+
+      rbind(sf1, sf2)
+    },error=function(c){
+      return(tibble())
+    })
+
+  }
+
+  frp.average.along.traj <- function(date, traj, buffer_km){
+    t.date <- traj %>% filter(traj_dt==date)
+    t.buffered <- st_as_sf(traj, coords=c("lon","lat"), crs=4326) %>%
+      utils.buffer_km(buffer_km)
+    rfp <- frp.read.modis(date)
+
+  }
+
+  utils.attach.frp.traj <- function(traj){
+   dates <- lubridate::date(traj$traj_dt) %>% unique()
+
+
+
+  }
+}
+
+
 
 utils.attach.basemaps <- function(m, radius_km=100, zoom_level=6){
 
