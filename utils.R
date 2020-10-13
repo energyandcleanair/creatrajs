@@ -74,6 +74,7 @@ utils.attach.fires <- function(m, f, radius_km=100){
 
 utils.trajs_at_date <- function(date, lat, lon, met_type, duration_hour, height){
   tryCatch({
+    print(paste("Trajs at date:",date))
     trajs <- splitr::hysplit_trajectory(
       lon = lon,
       lat = lat,
@@ -115,14 +116,15 @@ utils.attach.trajs <- function(mf, met_type, duration_hour, height){
       lat=st_coordinates(geometry)[2],
       lon=st_coordinates(geometry)[1])
 
-  trajs <- mapply(utils.trajs_at_date,
-                  mft$date,
+  trajs <- pbmcmapply(utils.trajs_at_date,
+                  lubridate::date(mft$date),
                   mft$lat,
                   mft$lon,
                   met_type,
                   duration_hour,
                   height,
-                  SIMPLIFY = F)
+                  SIMPLIFY = F,
+                  mc.cores=detectCores()-1)
 
   mft$trajs=trajs
   mft$lat = NULL
@@ -131,44 +133,91 @@ utils.attach.trajs <- function(mf, met_type, duration_hour, height){
   return(mft)
 }
 
+utils.frp.read.modis <- function(date){
+  tryCatch({
+    # Using the dat format
+    folder1 <- file.path(dir_modis, "MOD14", lubridate::year(date)) #TERRA
+    folder2 <- file.path(dir_modis, "MYD14", lubridate::year(date)) #AQUA
+    pattern <- paste0("M.D14_006_Fire_Table_",lubridate::year(date), sprintf("%03d", lubridate::yday(date)),".dat")
+    f1 <- list.files(folder1, pattern, full.names = T)
+    f2 <- list.files(folder2, pattern, full.names = T)
+
+    d1 <- read.csv(f1, skip = 6)
+    d2 <- read.csv(f2, skip = 6)
+
+    sf1 <- sf::st_as_sf(d1, coords=c("FP_longitude","FP_latitude"), crs=4326)
+    sf2 <- sf::st_as_sf(d2, coords=c("FP_longitude","FP_latitude"), crs=4326)
+
+    rbind(sf1, sf2)
+  },error=function(c){
+    return(NA)
+  })
+
+}
+
 utils.attach.frp <- function(mft, buffer_km){
 
-  frp.read.modis <- function(date){
-    tryCatch({
-      # Using the dat format
-      folder1 <- file.path(dir_modis, "MOD14", lubridate::year(date)) #TERRA
-      folder2 <- file.path(dir_modis, "MYD14", lubridate::year(date)) #AQUA
-      pattern <- paste0("M.D14_006_Fire_Table_",lubridate::year(date), sprintf("%03d", lubridate::yday(date)),".dat")
-      f1 <- list.files(folder1, pattern, full.names = T)
-      f2 <- list.files(folder2, pattern, full.names = T)
-
-      d1 <- read.csv(f1, skip = 6)
-      d2 <- read.csv(f2, skip = 6)
-
-      sf1 <- sf::st_as_sf(d1, coords=c("FP_longitude","FP_latitude"), crs=4326)
-      sf2 <- sf::st_as_sf(d2, coords=c("FP_longitude","FP_latitude"), crs=4326)
-
-      rbind(sf1, sf2)
-    },error=function(c){
-      return(tibble())
-    })
-
-  }
-
   frp.average.along.traj <- function(date, traj, buffer_km){
-    t.date <- traj %>% filter(traj_dt==date)
-    t.buffered <- st_as_sf(traj, coords=c("lon","lat"), crs=4326) %>%
+    t.date <- traj %>% filter(lubridate::date(traj_dt)==lubridate::date(date))
+    t.buffered <- st_as_sf(t.date, coords=c("lon","lat"), crs=4326) %>%
       utils.buffer_km(buffer_km)
-    rfp <- frp.read.modis(date)
+    rfp <- utils.frp.read.modis(date)
 
+    if(all(is.na(rfp))){
+      return(0)
+    }
+
+    t.rfp <- t.buffered %>% sf::st_join(rfp, st_intersects)
+    power <- coalesce( mean(t.rfp$FP_power, na.rm=T),0)
+
+    return(power)
   }
 
-  utils.attach.frp.traj <- function(traj){
-   dates <- lubridate::date(traj$traj_dt) %>% unique()
-
-
-
+  frp.calc <- function(traj, buffer_km){
+    dates <- lubridate::date(traj$traj_dt) %>% unique()
+    power <- do.call("mean", lapply(dates, frp.average.along.traj, traj=traj, buffer_km=buffer_km))
+    return(power)
   }
+
+  mft %>%
+    rowwise() %>%
+    mutate(frp=frp.calc(trajs, buffer_km))
+
+}
+
+
+utils.attach.frpv2<- function(mft, f2, buffer_km){
+
+  frp.average.along.traj <- function(date, traj, f2, buffer_km){
+
+    t.date <- traj %>% filter(lubridate::date(traj_dt)==lubridate::date(date))
+    t.buffered <- st_as_sf(t.date, coords=c("lon","lat"), crs=4326) %>%
+      utils.buffer_km(buffer_km)
+    rfp <- f2 %>% filter(date==!!date)
+
+    if(nrow(rfp)==0){
+      return(0)
+    }
+
+    t.rfp <- t.buffered %>% sf::st_join(sf::st_as_sf(rfp, coords=c("longitude","latitude"),crs=4326),
+                                        st_intersects)
+    power <- coalesce( mean(t.rfp$frp, na.rm=T),0)
+
+    return(power)
+  }
+
+  frp.calcv2 <- function(traj, f2, buffer_km){
+    dates <- lubridate::date(traj$traj_dt) %>% unique()
+    power <- do.call("mean", lapply(dates, frp.average.along.traj, traj=traj, f2=f2, buffer_km=buffer_km))
+    return(power)
+  }
+
+  f2 <- f2 %>% mutate(date=lubridate::date(acq_date)) %>% sf::st_as_sf(coords=c("longitude","latitude"),crs=4326)
+
+  mft %>%
+    rowwise() %>%
+    mutate(frp=frp.calcv2(trajs, f2, buffer_km))
+
 }
 
 
@@ -178,6 +227,7 @@ utils.attach.basemaps <- function(m, radius_km=100, zoom_level=6){
   mc <- m %>% distinct(region_id, geometry)
 
   geometry_to_basemap <- function(g, radius_km, zoom_level){
+
     bbox_100km <- g %>%
       st_transform(crs=3857) %>%
       st_buffer(radius_km*1000) %>%
@@ -188,7 +238,8 @@ utils.attach.basemaps <- function(m, radius_km=100, zoom_level=6){
             source="google", terrain="terrain")
   }
 
-  basemaps <- mc %>% rowwise() %>%
+  basemaps <- mc %>%
+    rowwise() %>%
     mutate(basemap = list(geometry_to_basemap(geometry, radius_km, zoom_level)))
 
   return(m %>% left_join(basemaps))
@@ -196,8 +247,7 @@ utils.attach.basemaps <- function(m, radius_km=100, zoom_level=6){
 }
 
 utils.save.meta <- function(filename, date, poll, value, unit, source, fires, country, region_id, ..., met_type, duration_hour, height){
-  n.fire = nrow(fires)
-  d <- tibble(country, region_id, source, lubridate::date(date), poll, value, unit, n.fire, height, met_type, duration_hour)
+  d <- tibble(country, region_id, source, lubridate::date(date), poll, value, unit, height, met_type, duration_hour)
   filepath <- file.path(dir_results, paste0(filename,".dat"))
   write.csv(d, file=filepath, row.names=F)
   return(filepath)

@@ -1,11 +1,18 @@
 
-map.trajs <- function(basemap, fires, trajs, region_id, source, date, value, unit, filename, powerplants, met_type, duration_hour, height, ..., add_plot=NULL){
+map.trajs <- function(basemap, fires, trajs, region_id, source, date, value, unit, filename, powerplants, met_type, duration_hour, height, add_fires, ..., add_plot=NULL){
 
   tryCatch({
     region_name <- tools::toTitleCase(region_id)
     source <- toupper(source)
 
-    subtitle <- paste0(date,". PM2.5 level: ",round(value)," ",unit)
+    # For powerplants and active fires
+    dot_values <- c()
+    dot_colors <- c()
+
+    subtitle <- ifelse(!is.na(value),
+                       paste0(date,". PM2.5 level: ",round(value)," ",unit),
+                       as.character(date))
+
     m <- ggmap(basemap) +
        coord_cartesian() +
        # geom_point(data=wri_power %>% dplyr::filter(country=="IDN"), inherit.aes = F, aes(x=longitude,y=latitude),
@@ -35,16 +42,14 @@ map.trajs <- function(basemap, fires, trajs, region_id, source, date, value, uni
              legend.direction = "horizontal",
              legend.margin=margin(0,0,0,0),
              legend.box.margin=margin(-20,0,10,0)) +
-       scale_shape_manual(name="Sector", values=c(0,1,2,3,4,5))+
-       scale_color_manual(name=NULL, values=c("red","black"),
-                          breaks=c("Active fire", "Thermal power plant"))+
+       scale_shape_manual(name="Sector", values=c(0,1,2,3,4,5)) +
        labs(title=paste0("Sources or air flowing into ", region_name),
             subtitle = subtitle,
             x='', y='',
             caption=paste0("CREA based on ",source, ", VIIRS and HYSPLIT.\nSize reflects the maximum fire intensity.\n",
                            "HYSPLIT parameters: ", duration_hour,"h | ",met_type," | ",height,"m." ))
 
-    if(!is.null(fires) & nrow(fires %>% filter(!is.na(date.fire)))){
+    if(add_fires && !is.null(fires) && !is.na(fires) && nrow(fires %>% filter(!is.na(date.fire)))){
 
       frp.min <- 0
       frp.max <- 8
@@ -63,6 +68,9 @@ map.trajs <- function(basemap, fires, trajs, region_id, source, date, value, uni
                           alpha=0.8,
                           position="jitter") +
         scale_size_continuous(range=c(1,9), limits=c(frp.min, frp.max), guide="none")
+
+      dot_values <- c(dot_values, "Active fire")
+      dot_colors <- c(dot_colors, "red")
     }
 
     if(!is.null(powerplants)){
@@ -78,18 +86,25 @@ map.trajs <- function(basemap, fires, trajs, region_id, source, date, value, uni
                           stroke=1,
                           alpha=0.8,
                           position="jitter", show.legend = T)
+
+      dot_values <- c(dot_values, "Thermal power plant")
+      dot_colors <- c(dot_colors, "black")
     }
+
+    m <- m +
+      scale_color_manual(name=NULL,
+                         values=dot_colors,
+                         breaks=dot_values)
 
     if(!is.null(add_plot)){
       m <- m + add_plot
     }
 
+
     filepath <- file.path(dir_results, paste0(filename,".jpg"))
     ggsave(plot=m, filename=filepath,
            width=8,
            height=7)
-
-
 
     return(filepath)
   }, error=function(c){

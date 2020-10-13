@@ -1,17 +1,50 @@
+process.city <- function(cities, source, f, powerplants, met_type, duration_hour, height, radius_km, buffer_km, add_fires, date_from="2019-01-01", date_to="2020-10-31"){
 
-process.city <- function(cities, source, f, powerplants, met_type, duration_hours, height, date_from="2019-09-01", date_to="2019-10-31"){
 
-  m <- rcrea::measurements(city=cities, source="cpcb", date_from=date_from, date_to=date_to, poll="pm25", with_geometry=T, with_metadata=T)
+  # Primary data ------------------------------------------------------------
+  poll <- "pm25"
+  m.base <- tidyr::crossing(region_id=tolower(cities), date=seq(lubridate::date(date_from), lubridate::date(date_to), by="d"), poll=poll)
 
-  m$geometry <- st_centroid(m$geometry)
-  powerplants$geometry <- st_centroid(powerplants$geometry)
+  m <- rcrea::measurements(city=cities, source=source, date_from=date_from, date_to=date_to, poll=poll, with_geometry=T, with_metadata=T) %>%
+    mutate(geometry=st_centroid(geometry),
+           date=lubridate::date(date))
 
-  mf <- utils.attach.fires(m, f, radius_km=radius_km)
+  if(length(unique(m$region_id))<length(cities)){
+    # Need to find geometry
+    # Trying from locations
+    l <- plyr::ddply(rcrea::locations(city=cities) %>%
+            mutate(region_id=tolower(city)),
+          c("country","region_id"), summarise,
+          geometry = st_centroid(st_union(geometry)))
 
+    if(nrow(l)==0){
+      stop("Couldn't find geometry")
+    }
+
+  }else{
+    l <- m %>% ungroup() %>% distinct(region_id, geometry)
+  }
+
+  m.all <- m.base %>%
+    left_join(l) %>%
+    left_join(m %>% select(-c(geometry))) %>%
+    filter(!sf::st_is_empty(geometry))
+
+
+  # Fires -------------------------------------------------------------------
+  if(add_fires){
+    mf <- utils.attach.fires(m.all, f, radius_km=radius_km)
+  }else{
+    mf <- m.all %>%
+      mutate(fires=NA)
+  }
+
+
+  # Trajectories ------------------------------------------------------------
   mft <- utils.attach.trajs(mf, met_type=met_type, duration_hour=duration_hour, height=height)
 
+  # Plot --------------------------------------------------------------------
   mftb <- mft %>% utils.attach.basemaps(radius_km=radius_km, zoom_level=7)
-
   mftb.plotted <- mftb %>%
     rowwise() %>%
     mutate(filename=paste("map.trajs-fire-power",gsub("-","",date),
@@ -20,15 +53,18 @@ process.city <- function(cities, source, f, powerplants, met_type, duration_hour
     ungroup() %>%
     mutate(
       plot=purrr::pmap_chr(., map.trajs,
-                                powerplants=powerplants,
-                                duration_hour=duration_hour,
-                                met_type=met_type,
-                                height=height),
+                           powerplants=powerplants,
+                           duration_hour=duration_hour,
+                           met_type=met_type,
+                           height=height,
+                           add_fires=add_fires),
            meta=purrr::pmap_chr(., utils.save.meta,
                                 duration_hour=duration_hour,
                                 met_type=met_type,
                                 height=height))
 
+
+  # Upload ------------------------------------------------------------------
   gcs_auth(Sys.getenv('GCS_AUTH_FILE'))
   mftp.uploaded <- mftb.plotted %>%
     filter(!is.na(plot)) %>%

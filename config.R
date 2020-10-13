@@ -1,8 +1,10 @@
+require(plyr)
 require(dplyr)
 require(sf)
 require(rcrea)
 require(splitr)
 require(pbmcapply)
+require(dplyr)
 # remove.packages("ggmap")
 # devtools::install_github("dkahle/ggmap") # Needed for bbox and google basemaps to work
 require(ggmap)
