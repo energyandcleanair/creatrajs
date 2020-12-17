@@ -8,6 +8,7 @@ importFrom(dplyr, "select")
 importFrom(dplyr, "mutate")
 importFrom(dplyr, "rowwise")
 importFrom(dplyr, "left_join")
+importFrom(dplyr, "distinct")
 
 importFrom(tibble, "tibble")
 
