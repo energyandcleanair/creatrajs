@@ -67,7 +67,7 @@ utils.attach.trajs <- function(mf, met_type, duration_hour, height){
                   duration_hour,
                   height,
                   SIMPLIFY = F,
-                  mc.cores=detectCores()-1)
+                  mc.cores=parallel::detectCores()-1)
 
   mft$trajs=trajs
   mft$lat = NULL
