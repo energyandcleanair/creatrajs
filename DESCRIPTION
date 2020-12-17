@@ -24,9 +24,9 @@ Imports:
     fuzzyjoin,
     googleCloudStorageR,
     MODIS,
-    exactextractr,
-    parallel
+    exactextractr
 Depends:
-    ggplot2
+    ggplot2,
+    parallel
 Remotes:
     rich-iannone/splitR
