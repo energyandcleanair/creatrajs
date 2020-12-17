@@ -1,3 +1,8 @@
+utils.ggmap_register <- function(){
+    try(readRenviron(".Renviron"))
+    ggmap::register_google(Sys.getenv("GOOGLE_MAP_API_KEY"))
+}
+
 utils.buffer_km <- function(g, buffer_km){
   g %>%
     st_transform(crs=3857) %>%
@@ -5,74 +10,12 @@ utils.buffer_km <- function(g, buffer_km){
     st_transform(crs=4326)
 }
 
-utils.read.fires <- function(){
-  files <- list.files("data","fire_.*.csv", full.names = T)
 
-  read.csv.fire <-function(f){
-    read.csv(f, stringsAsFactors = F) %>%
-      mutate_at(c("satellite","version"),as.character)
-  }
-
-  f <- do.call("bind_rows",lapply(files, read.csv.fire))
-  f
-}
-
-
-
-utils.attach.fires <- function(m, f, radius_km=100){
-
-  f.sf <- sf::st_as_sf(f, coords=c("longitude","latitude")) %>%
-    mutate(date=lubridate::date(acq_date),
-           geometry.fire=geometry) %>%
-    filter(date>=min(m$date),
-           date<=max(m$date))
-  sf::st_crs(f.sf) <- 4326
-
-  regions <- m %>% distinct(region_id, geometry)
-
-
-  f.regions <- regions %>% sf::st_as_sf() %>%
-    sf::st_transform(crs=3857) %>%
-    sf::st_buffer(radius_km*1000) %>%
-    sf::st_transform(crs=4326) %>%
-    sf::st_join(f.sf, join=st_contains) %>%
-    tibble() %>%
-    rename(date.fire=date) %>%
-    select(-c(geometry))
-
-  m$date_from <- m$date - lubridate::hours(x=duration_hour)
-
-  mf <- m %>% fuzzy_left_join(
-    f.regions,
-    by = c(
-      "region_id" = "region_id",
-      "date_from" = "date.fire",
-      "date" = "date.fire"
-    ),
-    match_fun = list(`==`, `<=`, `>=`)
-  ) %>%
-    rename(region_id=region_id.x) %>%
-    select(-c(region_id.y)) %>%
-    tidyr::nest(fires=-names(m))
-
-
-  #
-  # f.regions <- regions %>% sf::st_as_sf() %>%
-  #   sf::st_transform(crs=3857) %>%
-  #   sf::st_buffer(radius_km*1000) %>%
-  #   sf::st_transform(crs=4326) %>%
-  #   sf::st_join(f.sf, join=st_contains) %>%
-  #   tibble() %>%
-  #   select(-c(geometry)) %>%
-  #   tidyr::nest(fires=-c(region_id, date))
-  #
-  # mf <- m %>%
-  #   left_join(f.regions , by=c("region_id","date"))
-
-  return(mf)
-}
 
 utils.trajs_at_date <- function(date, lat, lon, met_type, duration_hour, height){
+
+  dir.create(dir_hysplit_output, showWarnings = F, recursive = T)
+
   tryCatch({
     print(paste("Trajs at date:",date))
     trajs <- splitr::hysplit_trajectory(
@@ -136,8 +79,8 @@ utils.attach.trajs <- function(mf, met_type, duration_hour, height){
 utils.frp.read.modis <- function(date){
   tryCatch({
     # Using the dat format
-    folder1 <- file.path(dir_modis, "MOD14", lubridate::year(date)) #TERRA
-    folder2 <- file.path(dir_modis, "MYD14", lubridate::year(date)) #AQUA
+    folder1 <- file.path(dir_modis14a1_archive, "MOD14", lubridate::year(date)) #TERRA
+    folder2 <- file.path(dir_modis14a1_archive, "MYD14", lubridate::year(date)) #AQUA
     pattern <- paste0("M.D14_006_Fire_Table_",lubridate::year(date), sprintf("%03d", lubridate::yday(date)),".dat")
     f1 <- list.files(folder1, pattern, full.names = T)
     f2 <- list.files(folder2, pattern, full.names = T)
@@ -152,8 +95,10 @@ utils.frp.read.modis <- function(date){
   },error=function(c){
     return(NA)
   })
-
 }
+
+
+
 
 utils.attach.frp <- function(mft, buffer_km){
 
@@ -186,45 +131,58 @@ utils.attach.frp <- function(mft, buffer_km){
 }
 
 
-utils.attach.frpv2<- function(mft, f2, buffer_km){
+utils.attach.frp.raster<- function(mft, buffer_km, duration_hour){
 
-  frp.average.along.traj <- function(date, traj, f2, buffer_km){
+  mft2 <- mft %>%
+    ungroup() %>%
+    mutate(trajs_extent=purrr::map(trajs, utils.modis.traj_extent, buffer_km=buffer_km))
 
-    t.date <- traj %>% filter(lubridate::date(traj_dt)==lubridate::date(date))
-    t.buffered <- st_as_sf(t.date, coords=c("lon","lat"), crs=4326) %>%
-      utils.buffer_km(buffer_km)
-    rfp <- f2 %>% filter(date==!!date)
+  # We're building one geotiff file per date per region
+  frp.rasters <- mft2 %>%
+    group_by(country, location_id) %>%
+    summarise(extent=utils.modis.union_extents(trajs_extent),
+              date_from=min(date)-lubridate::hours(duration_hour),
+              date_to=max(date)) %>%
+    mutate(geotiffs=purrr::pmap(., utils.modis.geotiffs)) %>%
+    dplyr::select(country, location_id, geotiffs) %>%
+    tidyr::unnest(geotiffs) %>%
+    rename(fire_raster=raster)
 
-    if(nrow(rfp)==0){
-      return(0)
-    }
 
-    t.rfp <- t.buffered %>% sf::st_join(sf::st_as_sf(rfp, coords=c("longitude","latitude"),crs=4326),
-                                        st_intersects)
-    power <- coalesce( mean(t.rfp$frp, na.rm=T),0)
-
-    return(power)
+  stack_aqua_terra <- function(x){
+    s <- raster::stack(unlist(x))
+    # ms <- calc(s, function(x) max(x, na.rm = TRUE))
+    return(s)
   }
+  # Combine TERRA and AQUA rasters
+  frp.rasters <- frp.rasters %>%
+    ungroup()%>%
+    group_by(country, location_id, date) %>%
+    summarise(fire_raster=list(stack_aqua_terra(fire_raster)))
 
-  frp.calcv2 <- function(traj, f2, buffer_km){
-    dates <- lubridate::date(traj$traj_dt) %>% unique()
-    power <- do.call("mean", lapply(dates, frp.average.along.traj, traj=traj, f2=f2, buffer_km=buffer_km))
-    return(power)
-  }
+  # Calculate mean frp along trajectories
+  # wtf <- mft2 %>%
+  #   mutate(frp=purrr::pmap_dbl(., utils.modis.frp_at_traj, frp.rasters=frp.rasters, buffer_km=buffer_km))
+  #
+  # wtfd <- wtf %>%
+  #   dplyr::select(country, location_id, date, frp) %>%
+  #   dplyr::group_by(country, location_id) %>%
+  #   tidyr::nest(frp=c(date,frp))
+  #
+  # # Adding frp to weather data
+  result <- mft %>%
+    left_join(frp.rasters, by=c("country","location_id","date"))
 
-  f2 <- f2 %>% mutate(date=lubridate::date(acq_date)) %>% sf::st_as_sf(coords=c("longitude","latitude"),crs=4326)
-
-  mft %>%
-    rowwise() %>%
-    mutate(frp=frp.calcv2(trajs, f2, buffer_km))
-
+  return(result)
 }
 
 
 
 utils.attach.basemaps <- function(m, radius_km=100, zoom_level=6){
 
-  mc <- m %>% distinct(region_id, geometry)
+  utils.ggmap_register()
+
+  mc <- m %>% distinct(location_id, geometry)
 
   geometry_to_basemap <- function(g, radius_km, zoom_level){
 
@@ -234,7 +192,7 @@ utils.attach.basemaps <- function(m, radius_km=100, zoom_level=6){
       st_transform(crs=4326) %>%
       st_bbox()
 
-    get_map(location=unname(bbox_100km),zoom=zoom_level,
+    ggmap::get_map(location=unname(bbox_100km),zoom=zoom_level,
             source="google", terrain="terrain")
   }
 
@@ -246,9 +204,10 @@ utils.attach.basemaps <- function(m, radius_km=100, zoom_level=6){
 
 }
 
-utils.save.meta <- function(filename, date, poll, value, unit, source, fires, country, region_id, ..., met_type, duration_hour, height){
-  d <- tibble(country, region_id, source, lubridate::date(date), poll, value, unit, height, met_type, duration_hour)
-  filepath <- file.path(dir_results, paste0(filename,".dat"))
+utils.save.meta <- function(filename, date, poll, value, unit, source, fires, country, location_id, ..., met_type, duration_hour, height, folder=dir_results){
+  d <- tibble(country, location_id, source, lubridate::date(date), poll, value, unit, height, met_type, duration_hour)
+  filepath <- file.path(folder, paste0(filename,".dat"))
   write.csv(d, file=filepath, row.names=F)
   return(filepath)
 }
+

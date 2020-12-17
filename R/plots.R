@@ -1,8 +1,12 @@
 
-map.trajs <- function(basemap, fires, trajs, region_id, source, date, value, unit, filename, powerplants, met_type, duration_hour, height, add_fires, ..., add_plot=NULL){
+
+map.trajs <- function(basemap, fires, trajs, fire_raster, location_id, location_name, source, date, value, unit, filename, met_type, duration_hour, height, add_fires, powerplants=NULL, ..., add_plot=NULL, folder=dir_results){
+
+  if(!is.null(powerplants)){
+    powerplants$geometry <- st_centroid(powerplants$geometry)
+  }
 
   tryCatch({
-    region_name <- tools::toTitleCase(region_id)
     source <- toupper(source)
 
     # For powerplants and active fires
@@ -24,7 +28,7 @@ map.trajs <- function(basemap, fires, trajs, region_id, source, date, value, uni
        geom_path(data = trajs %>%
                    dplyr::arrange(hour_along) %>%
                    mutate(subcluster=paste(traj_dt_i, hour_along %/% 8)),
-                 arrow = arrow(angle=18, length=unit(0.1,"inches")),
+                 arrow = ggplot2::arrow(angle=18, length=ggplot2::unit(0.1,"inches")),
                  aes(x = lon, y = lat, group=subcluster), color="darkred", alpha=0.6) +
 
        geom_path(data = trajs,
@@ -32,8 +36,8 @@ map.trajs <- function(basemap, fires, trajs, region_id, source, date, value, uni
 
        # geom_line(data = trajs_meas %>% dplyr::filter(value>=threshold) , aes(x = lon, y = lat, group=traj_dt_i), alpha=0.6, color='darkred')+
 
-       theme_crea() +
-       theme(panel.background = element_rect(fill='lightgray'),
+       rcrea::theme_crea() +
+       ggplot2::theme(panel.background = element_rect(fill='lightgray'),
              panel.border = element_rect(color='black', fill=NA),
              panel.grid = element_line(color=NA),
              plot.caption = element_text(lineheight = 0.9),
@@ -43,13 +47,32 @@ map.trajs <- function(basemap, fires, trajs, region_id, source, date, value, uni
              legend.margin=margin(0,0,0,0),
              legend.box.margin=margin(-20,0,10,0)) +
        scale_shape_manual(name="Sector", values=c(0,1,2,3,4,5)) +
-       labs(title=paste0("Sources or air flowing into ", region_name),
+       labs(title=paste0("Sources or air flowing into ", location_name),
             subtitle = subtitle,
             x='', y='',
             caption=paste0("CREA based on ",source, ", VIIRS and HYSPLIT.\nSize reflects the maximum fire intensity.\n",
                            "HYSPLIT parameters: ", duration_hour,"h | ",met_type," | ",height,"m." ))
 
-    if(add_fires && !is.null(fires) && !is.na(fires) && nrow(fires %>% filter(!is.na(date.fire)))){
+    if(add_fires && !is.null(fire_raster)){
+
+      bb <- ggmap::bb2bbox(attr(basemap, "bb"))
+      bb <- as.numeric(bb)
+      names(bb) <- c("xmin","ymin","xmax","ymax")
+      crop <- sf::st_as_sfc(st_bbox(bb)) %>% sf::st_set_crs(4326) %>% sf::st_transform(crs=attr(fire_raster,"crs"))
+      r.cropped <- raster::crop(fire_raster, as(crop, 'Spatial'))
+
+      # r.cropped.max <- calc(r.cropped, function(x) max(x, na.rm = TRUE))
+      fire_pol <- do.call("rbind", lapply(unstack(r.cropped),
+                                          FUN=function(x){tryCatch({p <- rasterToPolygons(x); names(p)="fire"; p},
+                                                                   error=function(c){NULL})}))
+
+
+      if(!is.null(fire_pol)){
+        m <- m + geom_sf(data=st_as_sf(),
+                         inherit.aes = F,
+                         fill="blue",
+                         color="blue")
+      }
 
       frp.min <- 0
       frp.max <- 8
@@ -101,14 +124,15 @@ map.trajs <- function(basemap, fires, trajs, region_id, source, date, value, uni
     }
 
 
-    filepath <- file.path(dir_results, paste0(filename,".jpg"))
-    ggsave(plot=m, filename=filepath,
+    filepath <- file.path(folder, paste0(filename,".jpg"))
+    ggsave(plot=m,
+           filename=filepath,
            width=8,
            height=7)
 
     return(filepath)
   }, error=function(c){
-    warning(paste("Error on  ", region_id, date))
+    warning(paste("Error on  ", location_id, date))
     return(NA)
   })
 }

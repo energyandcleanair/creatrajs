@@ -1,0 +1,31 @@
+Package: creatraj
+Title: What the Package Does (One Line, Title Case)
+Version: 0.0.0.9000
+Authors@R: 
+    person(given = "Hubert",
+           family = "Thieriot",
+           role = c("aut", "cre"),
+           email = "hubert@energyandcleanair.org")
+Description: Calculate back trajectories and add active fires.
+License: TBD
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.1
+Imports:
+    plyr,
+    magrittr,
+    tidyverse,
+    rcrea,
+    sf,
+    pbmcapply,
+    pbapply,
+    ggmap,
+    fuzzyjoin,
+    googleCloudStorageR,
+    MODIS,
+    exactextractr,
+Depends:
+    ggplot2
+Remotes:
+    rich-iannone/splitR
