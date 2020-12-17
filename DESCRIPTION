@@ -25,6 +25,7 @@ Imports:
     googleCloudStorageR,
     MODIS,
     exactextractr,
+    parallel
 Depends:
     ggplot2
 Remotes:
