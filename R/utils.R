@@ -60,7 +60,7 @@ utils.attach.trajs <- function(mf, met_type, duration_hour, height){
       lat=st_coordinates(geometry)[2],
       lon=st_coordinates(geometry)[1])
 
-  trajs <- pbmapply(utils.trajs_at_date,
+  trajs <- pbapply::pbmapply(utils.trajs_at_date,
                   lubridate::date(mft$date),
                   mft$lat,
                   mft$lon,
