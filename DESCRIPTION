@@ -23,7 +23,6 @@ Imports:
     ggmap,
     fuzzyjoin,
     googleCloudStorageR,
-    MODIS,
     exactextractr,
     parallel
 Depends:

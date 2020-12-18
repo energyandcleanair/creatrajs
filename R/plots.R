@@ -1,6 +1,6 @@
 
 
-map.trajs <- function(basemap, fires, trajs, fire_raster, location_id, location_name, source, date, value, unit, filename, met_type, duration_hour, height, add_fires, powerplants=NULL, ..., add_plot=NULL, folder=dir_results){
+map.trajs <- function(basemap, fires, trajs, fire_raster, location_id, location_name, source, date, value, unit, filename, met_type, duration_hour, height, add_fires, powerplants=NULL, add_plot=NULL, folder=dir_results, ...){
 
   if(!is.null(powerplants)){
     powerplants$geometry <- st_centroid(powerplants$geometry)
