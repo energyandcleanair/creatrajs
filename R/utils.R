@@ -1,6 +1,6 @@
 utils.ggmap_register <- function(){
     try(readRenviron(".Renviron"))
-    ggmap::register_google(Sys.getenv("GOOGLE_MAP_API_KEY"))
+    register_google(Sys.getenv("GOOGLE_MAP_API_KEY"))
 }
 
 utils.buffer_km <- function(g, buffer_km){

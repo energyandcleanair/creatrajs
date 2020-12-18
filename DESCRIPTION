@@ -20,12 +20,12 @@ Imports:
     sf,
     pbmcapply,
     pbapply,
-    ggmap,
     fuzzyjoin,
     googleCloudStorageR,
     exactextractr,
     parallel
 Depends:
     ggplot2,
+    ggmap
 Remotes:
     rich-iannone/splitR
