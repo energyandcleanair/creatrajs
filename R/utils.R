@@ -60,15 +60,17 @@ utils.attach.trajs <- function(mf, met_type, duration_hour, height){
       lat=st_coordinates(geometry)[2],
       lon=st_coordinates(geometry)[1])
 
-  trajs <- pbmcmapply(utils.trajs_at_date,
+  trajs <- pbmapply(utils.trajs_at_date,
                   lubridate::date(mft$date),
                   mft$lat,
                   mft$lon,
                   met_type,
                   duration_hour,
                   height,
-                  SIMPLIFY = F,
-                  mc.cores=parallel::detectCores()-1)
+                  SIMPLIFY = F
+                  # mc.cores=parallel::detectCores()-1
+                  )
+
 
   mft$trajs=trajs
   mft$lat = NULL
