@@ -32,8 +32,10 @@ process <- function(city,
                               with_geometry=F, with_metadata=T) %>%
     mutate(date=lubridate::force_tz(date, "UTC"))
 
-  m <- tidyr::crossing(l %>% select(location_id=id, location_name=name, geometry, country),
+  m <- tidyr::crossing(l %>% select(location_id=id),
                        date=dates) %>%
+    # tidyr::crossing doesn't work with geometry columns in some versions
+    left_join(l %>% select(location_id=id, location_name=name, geometry, country)) %>%
     left_join(meas)
 
 
