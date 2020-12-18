@@ -22,7 +22,6 @@ Imports:
     pbapply,
     fuzzyjoin,
     googleCloudStorageR,
-    exactextractr,
     parallel
 Depends:
     ggplot2,
