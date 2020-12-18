@@ -57,7 +57,7 @@ process <- function(city,
 
   # Trajectories ------------------------------------------------------------
   mft <- utils.attach.trajs(mf, met_type=met_type, duration_hour=duration_hour, height=height)
-
+  print(mft$trajs)
 
   # Fire Radiative Power ----------------------------------------------------------
   # mft <- utils.attach.frp.raster(mft, buffer_km=buffer_km, duration_hour=duration_hour)

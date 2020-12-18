@@ -186,14 +186,14 @@ utils.attach.basemaps <- function(m, radius_km=100, zoom_level=6){
   mc <- m %>% distinct(location_id, geometry)
 
   geometry_to_basemap <- function(g, radius_km, zoom_level){
-
+    print(g)
     bbox_100km <- g %>%
       st_set_crs(4326) %>%
       st_transform(crs=3857) %>%
       st_buffer(radius_km*1000) %>%
       st_transform(crs=4326) %>%
       st_bbox()
-
+    print(bbox)
     ggmap::get_map(location=unname(bbox_100km),zoom=zoom_level,
             source="google", terrain="terrain")
   }
