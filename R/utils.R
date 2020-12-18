@@ -5,7 +5,7 @@ utils.ggmap_register <- function(){
 
 utils.buffer_km <- function(g, buffer_km){
   g %>%
-    st_set_crs(crs=4326) %>%
+    st_set_crs(4326) %>%
     st_transform(crs=3857) %>%
     st_buffer(buffer_km*1000) %>%
     st_transform(crs=4326)
@@ -188,7 +188,7 @@ utils.attach.basemaps <- function(m, radius_km=100, zoom_level=6){
   geometry_to_basemap <- function(g, radius_km, zoom_level){
 
     bbox_100km <- g %>%
-      st_set_crs(crs=4326) %>%
+      st_set_crs(4326) %>%
       st_transform(crs=3857) %>%
       st_buffer(radius_km*1000) %>%
       st_transform(crs=4326) %>%
