@@ -64,6 +64,7 @@ utils.fires.attach <- function(m, f, radius_km=100){
 
 
   f.regions <- regions %>% sf::st_as_sf() %>%
+    sf::st_set_crs(crs=4326) %>%
     sf::st_transform(crs=3857) %>%
     sf::st_buffer(radius_km*1000) %>%
     sf::st_transform(crs=4326) %>%

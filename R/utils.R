@@ -5,6 +5,7 @@ utils.ggmap_register <- function(){
 
 utils.buffer_km <- function(g, buffer_km){
   g %>%
+    st_set_crs(crs=4326) %>%
     st_transform(crs=3857) %>%
     st_buffer(buffer_km*1000) %>%
     st_transform(crs=4326)
