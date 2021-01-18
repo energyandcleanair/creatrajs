@@ -27,4 +27,4 @@ Depends:
     ggplot2,
     ggmap
 Remotes:
-    rich-iannone/splitR
+    hubert-thieriot/splitR
