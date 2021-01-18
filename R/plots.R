@@ -78,27 +78,29 @@ map.trajs <- function(basemap, fires, trajs, location_id, location_name, source,
       }
      }
 
-    frp.min <- 0
-    frp.max <- 8
+      if(nrow(fires %>% filter(!is.na(acq_date)))>0){
+        frp.min <- 0
+        frp.max <- 8
 
-    fires$frp <- min(fires$frp, frp.max)
-    fires$frp <- max(fires$frp, frp.min)
+        fires$frp <- min(fires$frp, frp.max)
+        fires$frp <- max(fires$frp, frp.min)
 
-    m <- m + geom_point(data=fires, inherit.aes = F,
-                        aes(x=st_coordinates(geometry.fire)[,1],
-                            y=st_coordinates(geometry.fire)[,2],
-                            size=frp,
-                            color="Active fire"),
-                        fill="orange",
-                        shape="triangle",
-                        stroke=1,
-                        alpha=0.8,
-                        position="jitter") +
-      scale_size_continuous(range=c(1,9), limits=c(frp.min, frp.max), guide="none")
+        m <- m + geom_point(data=fires, inherit.aes = F,
+                            aes(x=st_coordinates(geometry.fire)[,1],
+                                y=st_coordinates(geometry.fire)[,2],
+                                size=frp,
+                                color="Active fire"),
+                            fill="orange",
+                            shape="triangle",
+                            stroke=1,
+                            alpha=0.8,
+                            position="jitter") +
+          scale_size_continuous(range=c(1,9), limits=c(frp.min, frp.max), guide="none")
 
-    dot_values <- c(dot_values, "Active fire")
-    dot_colors <- c(dot_colors, "red")
-  }
+        dot_values <- c(dot_values, "Active fire")
+        dot_colors <- c(dot_colors, "red")
+      }
+    }
 
     if(!is.null(powerplants)){
 

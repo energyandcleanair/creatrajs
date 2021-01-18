@@ -76,7 +76,7 @@ utils.fires.read <- function(date_from=NULL, date_to=NULL, region="South_Asia"){
   }
 
   f <- do.call("bind_rows",pbapply::pblapply(files, read.csv.fire))
-  f
+  f %>% dplyr::filter(!is.na(acq_date))
 }
 
 
