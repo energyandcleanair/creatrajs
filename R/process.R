@@ -97,11 +97,11 @@ process <- function(city,
       filter(!is.na(plot)) %>%
       rowwise() %>%
       mutate(plot_uploaded=list(googleCloudStorageR::gcs_upload(plot,
-                                           bucket=trajs.bucket,
+                                           bucket=trajs.bucket(),
                                            name=paste0(trajs.folder,"/",basename(plot)),
                                            predefinedAcl="default")),
              meta_uploaded=list(googleCloudStorageR::gcs_upload(meta,
-                                           bucket=trajs.bucket,
+                                           bucket=trajs.bucket(),
                                            name=paste0(trajs.folder,"/",basename(meta)),
                                            predefinedAcl="default")))
   }

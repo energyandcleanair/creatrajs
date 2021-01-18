@@ -1,35 +1,29 @@
-# source('./config.R')
-# debugSource('./utils.R')
-# debugSource('./utils.modis.R')
-# debugSource('./utils.fires.R')
-# debugSource('./plots.R')
-# source('./process.R')
-
 
 library(creatrajs)
-source('R/config.R')
+
 ###########################
 # PARAMETERS
 ###########################
 # city <- c("singapore", "jakarta", "hanoi", "Ho Chi Minh City", "Bangkok", "chiang mai", "Kuala Lumpur", "Bataan", "Manila") #,"lucknow")#,"pune","jaipur","hyderabad","mumbai","varanasi","bengaluru","bangalore","Ahmedabad","chennai","kolkata", "chandigarh")
 # city <- c("Rawalpindi", "Islamabad", "Lahore", "Karachi")
-city <- c("bangkok","hong kong")#,"lucknow") #,"pune","jaipur","hyderabad","mumbai","varanasi","bengaluru","bangalore","Ahmedabad","chennai","kolkata", "chandigarh")
+city <- c("bangkok")#,"lucknow") #,"pune","jaipur","hyderabad","mumbai","varanasi","bengaluru","bangalore","Ahmedabad","chennai","kolkata", "chandigarh")
 source <- "airvisual"
-date_from <- "2020-12-01"
+date_from <- "2021-01-10"
 date_to <- lubridate::today()
 buffer_km <- 20
 radius_km <- 200
 duration_hour <- 72 # Liu 2018
 height <- 500 # Liu 2018. Should be improved by considering PBL pre/post monsoon
-met_types <- c("reanalysis")
+met_types <- c("gdas1")
 add_fires <- T
 poll <- c("pm10")
+region <- "South_Asia"
 
 ###########################
 # PROCESSING
 ###########################
-creatrajs::utils.fires.download()
-f <- creatrajs::utils.fires.read()
+creatrajs::utils.fires.download(date_from=date_from, date_to=date_to, region=region)
+f <- creatrajs::utils.fires.read(date_from=date_from, date_to=date_to, region=region)
 
 
 powerplants <- NULL #rcrea::locations(type='powerplant', with_meta = T, with_geometry = T) %>%
