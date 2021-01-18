@@ -67,8 +67,14 @@ process <- function(city,
   mftb <- mft %>% utils.attach.basemaps(radius_km=radius_km, zoom_level=10)
   mftb.plotted <- mftb %>%
     rowwise() %>%
-    mutate(filename=paste("map.trajs-fire-power",gsub("-","",date),
-                        country, tolower(location_name), paste0(radius_km,"km"), gsub("\\.","",met_type), sep=".")
+    mutate(filename=paste("map.trajs-fire-power",
+                          gsub("-","",date),
+                          country,
+                          tolower(location_name),
+                          paste0(radius_km,"km"),
+                          paste0(height,"m"),
+                          gsub("\\.","",met_type),
+                          sep=".")
   ) %>%
     ungroup() %>%
     mutate(
