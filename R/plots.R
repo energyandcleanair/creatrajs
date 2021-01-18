@@ -1,6 +1,8 @@
 
 
-map.trajs <- function(basemap, fires, trajs, fire_raster, location_id, location_name, source, date, value, unit, filename, met_type, duration_hour, height, add_fires, powerplants=NULL, add_plot=NULL, folder=dir_results, ...){
+map.trajs <- function(basemap, fires, trajs, location_id, location_name, source, date, poll, value,
+                      unit, filename, met_type, duration_hour, height, add_fires,
+                      fire_raster=NULL, powerplants=NULL, add_plot=NULL, folder=dir_results, ...){
 
   if(!is.null(powerplants)){
     powerplants$geometry <- st_centroid(powerplants$geometry)
@@ -14,7 +16,7 @@ map.trajs <- function(basemap, fires, trajs, fire_raster, location_id, location_
     dot_colors <- c()
 
     subtitle <- ifelse(!is.na(value),
-                       paste0(date,". PM2.5 level: ",round(value)," ",unit),
+                       paste0(date,". ", rcrea::poll_str(poll)," level: ",round(value)," ",unit),
                        as.character(date))
 
     m <- ggmap(basemap) +
@@ -53,8 +55,9 @@ map.trajs <- function(basemap, fires, trajs, fire_raster, location_id, location_
             caption=paste0("CREA based on ",source, ", VIIRS and HYSPLIT.\nSize reflects the maximum fire intensity.\n",
                            "HYSPLIT parameters: ", duration_hour,"h | ",met_type," | ",height,"m." ))
 
-    if(add_fires && !is.null(fire_raster)){
+    if(add_fires){
 
+     if(!is.null(fire_raster)){
       bb <- ggmap::bb2bbox(attr(basemap, "bb"))
       bb <- as.numeric(bb)
       names(bb) <- c("xmin","ymin","xmax","ymax")
@@ -68,33 +71,34 @@ map.trajs <- function(basemap, fires, trajs, fire_raster, location_id, location_
 
 
       if(!is.null(fire_pol)){
-        m <- m + geom_sf(data=st_as_sf(),
+        m <- m + geom_sf(data=st_as_sf(fire_pol),
                          inherit.aes = F,
                          fill="blue",
                          color="blue")
       }
+     }
 
-      frp.min <- 0
-      frp.max <- 8
+    frp.min <- 0
+    frp.max <- 8
 
-      fires$frp <- min(fires$frp, frp.max)
-      fires$frp <- max(fires$frp, frp.min)
+    fires$frp <- min(fires$frp, frp.max)
+    fires$frp <- max(fires$frp, frp.min)
 
-      m <- m + geom_point(data=fires, inherit.aes = F,
-                          aes(x=st_coordinates(geometry.fire)[,1],
-                              y=st_coordinates(geometry.fire)[,2],
-                              size=frp,
-                              color="Active fire"),
-                          fill="orange",
-                          shape="triangle",
-                          stroke=1,
-                          alpha=0.8,
-                          position="jitter") +
-        scale_size_continuous(range=c(1,9), limits=c(frp.min, frp.max), guide="none")
+    m <- m + geom_point(data=fires, inherit.aes = F,
+                        aes(x=st_coordinates(geometry.fire)[,1],
+                            y=st_coordinates(geometry.fire)[,2],
+                            size=frp,
+                            color="Active fire"),
+                        fill="orange",
+                        shape="triangle",
+                        stroke=1,
+                        alpha=0.8,
+                        position="jitter") +
+      scale_size_continuous(range=c(1,9), limits=c(frp.min, frp.max), guide="none")
 
-      dot_values <- c(dot_values, "Active fire")
-      dot_colors <- c(dot_colors, "red")
-    }
+    dot_values <- c(dot_values, "Active fire")
+    dot_colors <- c(dot_colors, "red")
+  }
 
     if(!is.null(powerplants)){
 
@@ -125,6 +129,7 @@ map.trajs <- function(basemap, fires, trajs, fire_raster, location_id, location_
 
 
     filepath <- file.path(folder, paste0(filename,".jpg"))
+    dir.create(folder, showWarnings = F)
     ggsave(plot=m,
            filename=filepath,
            width=8,

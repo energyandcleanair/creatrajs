@@ -88,16 +88,19 @@ process <- function(city,
 
   # Upload ------------------------------------------------------------------
   if(upload_results){
-    gcs_auth(Sys.getenv('GCS_AUTH_FILE'))
+
+    if(Sys.getenv('GCS_AUTH_FILE')!=""){
+      gcs_auth(Sys.getenv('GCS_AUTH_FILE'))
+    }
 
     mftp.uploaded <- mftb.plotted %>%
       filter(!is.na(plot)) %>%
       rowwise() %>%
-      mutate(plot_uploaded=list(gcs_upload(plot,
+      mutate(plot_uploaded=list(googleCloudStorageR::gcs_upload(plot,
                                            bucket=trajs.bucket,
                                            name=paste0(trajs.folder,"/",basename(plot)),
                                            predefinedAcl="default")),
-             meta_uploaded=list(gcs_upload(meta,
+             meta_uploaded=list(googleCloudStorageR::gcs_upload(meta,
                                            bucket=trajs.bucket,
                                            name=paste0(trajs.folder,"/",basename(meta)),
                                            predefinedAcl="default")))

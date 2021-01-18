@@ -42,11 +42,12 @@ utils.fires.read <- function(region="South_Asia"){
                date=lubridate::date(acq_date))
     }, error=function(c){
       warning(paste("Failed reading file", f))
+      message(c)
       return(NULL)
     })
   }
 
-  f <- do.call("bind_rows",pblapply(c(files_nrt, files_archive), read.csv.fire))
+  f <- do.call("bind_rows",pbapply::pblapply(c(files_nrt, files_archive), read.csv.fire))
   f
 }
 
@@ -75,7 +76,7 @@ utils.fires.attach <- function(m, f, radius_km=100){
 
   m$date_from <- m$date - lubridate::hours(x=duration_hour)
 
-  mf <- m %>% fuzzy_left_join(
+  mf <- m %>% fuzzyjoin::fuzzy_left_join(
     f.regions,
     by = c(
       "location_id" = "location_id",
