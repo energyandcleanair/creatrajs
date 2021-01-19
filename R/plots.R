@@ -103,7 +103,7 @@ map.trajs <- function(basemap, fires, trajs, location_id, location_name, source,
     }
 
     if(!is.null(powerplants)){
-
+      geometry_to_basemap
 
       m <- m + geom_point(data=powerplants, inherit.aes = F,
                           aes(x=st_coordinates(st_centroid(geometry))[,1],
