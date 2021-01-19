@@ -199,7 +199,7 @@ utils.attach.basemaps <- function(m, radius_km=100, zoom_level=6){
         st_transform(crs=4326) %>%
         st_bbox()
       ggmap::get_map(location=unname(bbox_100km),zoom=zoom_level,
-                     source="google", terrain="terrain")
+                     source="stamen", terrain="terrain")
     }, error=function(err){
       print("Failed to build basemap")
       print(g)
@@ -210,7 +210,7 @@ utils.attach.basemaps <- function(m, radius_km=100, zoom_level=6){
   basemaps <- mc %>%
     rowwise() %>%
     mutate(basemap = list(geometry_to_basemap(geometry, radius_km, zoom_level))) %>%
-    filter(!is.na(basemap))
+    filter(!is.na(basemap[[1]]))
 
   return(m %>% left_join(basemaps))
 

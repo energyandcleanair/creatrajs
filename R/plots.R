@@ -49,7 +49,7 @@ map.trajs <- function(basemap, fires, trajs, location_id, location_name, source,
              legend.margin=margin(0,0,0,0),
              legend.box.margin=margin(-20,0,10,0)) +
        scale_shape_manual(name="Sector", values=c(0,1,2,3,4,5)) +
-       labs(title=paste0("Sources or air flowing into ", location_name),
+       labs(title=paste0("Sources of air flowing into ", location_name),
             subtitle = subtitle,
             x='', y='',
             caption=paste0("CREA based on ",source, ", VIIRS and HYSPLIT.\nSize reflects the maximum fire intensity.\n",
@@ -103,7 +103,6 @@ map.trajs <- function(basemap, fires, trajs, location_id, location_name, source,
     }
 
     if(!is.null(powerplants)){
-      geometry_to_basemap
 
       m <- m + geom_point(data=powerplants, inherit.aes = F,
                           aes(x=st_coordinates(st_centroid(geometry))[,1],
