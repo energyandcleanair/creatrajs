@@ -216,7 +216,7 @@ utils.attach.basemaps <- function(m, radius_km=100, zoom_level=6){
 
 }
 
-utils.save.meta <- function(filename, date, meas, fires, country, location_id, ..., met_type, duration_hour, height, folder=dir_results){
+utils.save.meta <- function(filename, date, meas, fires, country, location_id, ..., met_type, duration_hour, height, folder=dir_results()){
   d <- tibble(country, location_id, lubridate::date(date), height, met_type, duration_hour)
   filepath <- file.path(folder, paste0(filename,".dat"))
   write.csv(d, file=filepath, row.names=F)
