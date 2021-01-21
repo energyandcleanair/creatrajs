@@ -19,7 +19,7 @@ date_to <- lubridate::today()
 buffer_km <- 20
 radius_km <- 200
 duration_hour <- 72 # Liu 2018
-heights <- c(100, 500) # Liu 2018. Should be improved by considering PBL pre/post monsoon
+heights <- c(500) # Liu 2018 recommends 500m. Should be improved by considering PBL pre/post monsoon
 met_types <- c("gdas1")
 add_fires <- T
 poll <- c("pm10", "pm25")
