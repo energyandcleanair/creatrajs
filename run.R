@@ -22,7 +22,7 @@ duration_hour <- 72 # Liu 2018
 heights <- c(100, 500) # Liu 2018. Should be improved by considering PBL pre/post monsoon
 met_types <- c("gdas1")
 add_fires <- T
-poll <- c("pm10")
+poll <- c("pm10", "pm25")
 region <- "South_Asia"
 
 ###########################
