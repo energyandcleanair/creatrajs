@@ -1,11 +1,13 @@
 library(remotes)
+remotes::install_github("hubert-thieriot/splitr", upgrade_dependencies = FALSE, upgrade="never")
+remotes::install_github("energyandcleanair/rcrea", upgrade_dependencies = FALSE, upgrade="never")
 remotes::install_github("energyandcleanair/creatrajs", upgrade_dependencies = FALSE, upgrade="never")
+
 library(creatrajs)
 
 ###########################
 # PARAMETERS
 ###########################
-source <- "airvisual"
 source_city <- list(
   "airvisual"=c("hong kong", "bangkok", "jakarta", "manila"),
   "openaq"=c("Rawalpindi", "Islamabad", "Lahore", "Karachi"),

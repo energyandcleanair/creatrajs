@@ -1,7 +1,7 @@
 process <- function(city,
                          source,
                          date_from,
-                         poll="pm25",
+                         poll=c("pm25","pm10"),
                          date_to=lubridate::today(),
                          met_type="gdas1",
                          duration_hour=72,
@@ -30,7 +30,9 @@ process <- function(city,
                               date_from=date_from, date_to=date_to,
                               poll=poll,
                               with_geometry=F, with_metadata=T) %>%
-    mutate(date=lubridate::force_tz(date, "UTC"))
+    mutate(date=lubridate::force_tz(date, "UTC")) %>%
+    tidyr::nest(meas=c(poll, unit, value, process_id, source)) %>%
+    select(location_id, date, meas)
 
   m <- tidyr::crossing(l %>% select(location_id=id),
                        date=dates) %>%
@@ -43,12 +45,12 @@ process <- function(city,
     stop("No measurement or location for that city")
   }
 
-  m$geometry <- st_centroid(m$geometry)
+  m$geometry <- sf::st_centroid(m$geometry)
 
 
   # Fires -------------------------------------------------------------------
   if(add_fires & !is.null(fires)){
-    mf <- utils.fires.attach(m, fires, radius_km=radius_km)
+    mf <- creatrajs::utils.fires.attach(m, fires, radius_km=radius_km)
   }else{
     mf <- m %>%
       mutate(fires=NA)
@@ -57,7 +59,10 @@ process <- function(city,
 
   # Trajectories ------------------------------------------------------------
   mft <- utils.attach.trajs(mf, met_type=met_type, duration_hour=duration_hour, height=height)
-  print(mft$trajs)
+
+  # Only keep days with trajectories
+  mft <- mft  %>% filter(nrow(trajs)>0)
+
 
   # Fire Radiative Power ----------------------------------------------------------
   # mft <- utils.attach.frp.raster(mft, buffer_km=buffer_km, duration_hour=duration_hour)
@@ -96,7 +101,7 @@ process <- function(city,
   if(upload_results){
 
     if(Sys.getenv('GCS_AUTH_FILE')!=""){
-      gcs_auth(Sys.getenv('GCS_AUTH_FILE'))
+      googleCloudStorageR::gcs_auth(Sys.getenv('GCS_AUTH_FILE'))
     }
 
     mftp.uploaded <- mftb.plotted %>%

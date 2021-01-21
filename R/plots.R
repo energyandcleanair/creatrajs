@@ -1,7 +1,7 @@
 
 
-map.trajs <- function(basemap, fires, trajs, location_id, location_name, source, date, poll, value,
-                      unit, filename, met_type, duration_hour, height, add_fires,
+map.trajs <- function(basemap, fires, trajs, location_id, location_name, date,
+                      meas, filename, met_type, duration_hour, height, add_fires,
                       fire_raster=NULL, powerplants=NULL, add_plot=NULL, folder=dir_results, ...){
 
   if(!is.null(powerplants)){
@@ -9,15 +9,17 @@ map.trajs <- function(basemap, fires, trajs, location_id, location_name, source,
   }
 
   tryCatch({
-    source <- toupper(source)
+    source_legend <- paste0(rcrea::source_str(unique(meas$source)), collapse=",")
 
     # For powerplants and active fires
     dot_values <- c()
     dot_colors <- c()
 
-    subtitle <- ifelse(!is.na(value),
-                       paste0(date,". ", rcrea::poll_str(poll)," level: ",round(value)," ",unit),
-                       as.character(date))
+    # Get measurements values in subtitle
+    subtitle_poll <- paste0(rcrea::poll_str(meas$poll)," level: ",round(meas$value)," ",meas$unit,
+                 collapse=". ")
+
+    subtitle <- paste0(date, ". ", subtitle_poll)
 
     m <- ggmap(basemap) +
        coord_cartesian() +
@@ -52,7 +54,7 @@ map.trajs <- function(basemap, fires, trajs, location_id, location_name, source,
        labs(title=paste0("Sources of air flowing into ", location_name),
             subtitle = subtitle,
             x='', y='',
-            caption=paste0("CREA based on ",source, ", VIIRS and HYSPLIT.\nSize reflects the maximum fire intensity.\n",
+            caption=paste0("CREA based on ",source_legend, ", VIIRS and HYSPLIT.\nSize reflects the maximum fire intensity.\n",
                            "HYSPLIT parameters: ", duration_hour,"h | ",met_type," | ",height,"m." ))
 
     if(add_fires){
