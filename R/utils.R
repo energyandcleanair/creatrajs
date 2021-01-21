@@ -210,7 +210,7 @@ utils.attach.basemaps <- function(m, radius_km=100, zoom_level=6){
   basemaps <- mc %>%
     rowwise() %>%
     mutate(basemap = list(geometry_to_basemap(geometry, radius_km, zoom_level))) %>%
-    filter(!is.na(basemap[[1]]))
+    filter(!all(is.na(basemap)))
 
   return(m %>% left_join(basemaps))
 
