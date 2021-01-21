@@ -9,15 +9,17 @@ map.trajs <- function(basemap, fires, trajs, location_id, location_name, date,
   }
 
   tryCatch({
-    source_legend <- paste0(rcrea::source_str(unique(meas$source)), collapse=",")
+    source_legend <- if(!is.null(meas)) paste0(rcrea::source_str(unique(meas$source)), collapse=",") else ""
+
 
     # For powerplants and active fires
     dot_values <- c()
     dot_colors <- c()
 
     # Get measurements values in subtitle
-    subtitle_poll <- paste0(rcrea::poll_str(meas$poll)," level: ",round(meas$value)," ",meas$unit,
-                 collapse=". ")
+    subtitle_poll <- ifelse(!is.null(meas),
+                            paste0(rcrea::poll_str(meas$poll)," level: ",round(meas$value)," ",meas$unit,collapse=". "),
+                            "")
 
     subtitle <- paste0(date, ". ", subtitle_poll)
 
