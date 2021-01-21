@@ -1,5 +1,5 @@
 library(remotes)
-remotes::install_github("energyandcleanair/creatrajs", upgrade_dependencies = FALSE)
+remotes::install_github("energyandcleanair/creatrajs", upgrade_dependencies = FALSE, upgrade="never")
 library(creatrajs)
 
 ###########################
