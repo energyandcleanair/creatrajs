@@ -15,7 +15,7 @@ utils.fires.get_firms_subfolder <- function(region="South_Asia"){
 }
 
 utils.fires.download <- function(date_from=NULL, date_to=NULL, region="South_Asia"){
-  d <- utils.fires.get_firms_folder()
+  d <- utils.fires.get_firms_subfolder(region=region)
   dir.create(d, showWarnings = F, recursive = T)
 
 
