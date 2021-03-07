@@ -61,7 +61,7 @@ process <- function(city,
   mft <- utils.attach.trajs(mf, met_type=met_type, duration_hour=duration_hour, height=height)
 
   # Only keep days with trajectories
-  mft <- mft  %>% filter(nrow(trajs)>0)
+  mft <- mft  %>% filter(!is.na(trajs) && nrow(trajs)>0)
 
 
   # Fire Radiative Power ----------------------------------------------------------
