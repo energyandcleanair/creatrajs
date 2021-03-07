@@ -1,3 +1,23 @@
+utils.check_environment <- function(){
+
+  suppressWarnings(try(readRenviron(".Renviron"), silent = TRUE))
+  suppressWarnings(try(dotenv::load_dot_env(), silent = TRUE))
+
+
+  vars <- c(
+    "DIR_DATA",
+    "DIR_HYSPLIT_MET",
+    "DIR_FIRMS",
+    "GOOGLE_MAP_API_KEY")
+
+  print("Checking Environment")
+  for(v in vars){
+    v.value <- Sys.getenv(v)
+    print(paste0(v,": ", ifelse(v.value=="", "MISSING", "OK")))
+  }
+
+}
+
 utils.ggmap_register <- function(){
     try(readRenviron(".Renviron"))
     ggmap::register_google(Sys.getenv("GOOGLE_MAP_API_KEY"))
@@ -11,73 +31,73 @@ utils.buffer_km <- function(g, buffer_km){
     st_transform(crs=4326)
 }
 
+#
+#
+# utils.trajs_at_date <- function(date, lat, lon, met_type, duration_hour, height){
+#
+#   init_folders()
+#
+#   tryCatch({
+#     print(paste("Trajs at date:",date))
+#     trajs <- splitr::hysplit_trajectory(
+#       lon = lon,
+#       lat = lat,
+#       height = height,
+#       duration = duration_hour,
+#       days = date,
+#       daily_hours = c(0, 6, 12, 18),
+#       direction = "backward",
+#       met_type = met_type,
+#       extended_met = F,
+#       met_dir = dir_hysplit_met,
+#       exec_dir = dir_hysplit_output,
+#       clean_up = F
+#     )
+#
+#     # Update fields to be compatible with OpenAIR
+#     trajs$hour.inc <- trajs$hour_along
+#     trajs$date <- trajs$traj_dt_i
+#     trajs$date2 <- trajs$traj_dt
+#     trajs$year <- lubridate::year(trajs$traj_dt_i)
+#     trajs$month <- lubridate::month(trajs$traj_dt_i)
+#     trajs$day <- lubridate::date(trajs$traj_dt_i)
+#
+#     return(trajs)
+#
+#   },
+#   error=function(c){
+#     print(c)
+#     return(NA)
+#   })
+# }
 
-
-utils.trajs_at_date <- function(date, lat, lon, met_type, duration_hour, height){
-
-  init_folders()
-
-  tryCatch({
-    print(paste("Trajs at date:",date))
-    trajs <- splitr::hysplit_trajectory(
-      lon = lon,
-      lat = lat,
-      height = height,
-      duration = duration_hour,
-      days = date,
-      daily_hours = c(0, 6, 12, 18),
-      direction = "backward",
-      met_type = met_type,
-      extended_met = F,
-      met_dir = dir_hysplit_met,
-      exec_dir = dir_hysplit_output,
-      clean_up = F
-    )
-
-    # Update fields to be compatible with OpenAIR
-    trajs$hour.inc <- trajs$hour_along
-    trajs$date <- trajs$traj_dt_i
-    trajs$date2 <- trajs$traj_dt
-    trajs$year <- lubridate::year(trajs$traj_dt_i)
-    trajs$month <- lubridate::month(trajs$traj_dt_i)
-    trajs$day <- lubridate::date(trajs$traj_dt_i)
-
-    return(trajs)
-
-  },
-  error=function(c){
-    print(c)
-    return(NA)
-  })
-}
-
-
-utils.attach.trajs <- function(mf, met_type, duration_hour, height){
-
-  mft <- mf %>%
-    rowwise() %>%
-    mutate(
-      lat=st_coordinates(geometry)[2],
-      lon=st_coordinates(geometry)[1])
-
-  trajs <- pbapply::pbmapply(utils.trajs_at_date,
-                  lubridate::date(mft$date),
-                  mft$lat,
-                  mft$lon,
-                  met_type,
-                  duration_hour,
-                  height,
-                  SIMPLIFY = F
-                  # mc.cores=parallel::detectCores()-1
-                  )
-
-
-  mft$trajs=trajs
-  mft$lat = NULL
-  mft$lon = NULL
-
-  return(mft)
-}
+#
+# utils.attach.trajs <- function(mf, met_type, duration_hour, height){
+#
+#   mft <- mf %>%
+#     rowwise() %>%
+#     mutate(
+#       lat=st_coordinates(geometry)[2],
+#       lon=st_coordinates(geometry)[1])
+#
+#   trajs <- pbapply::pbmapply(utils.trajs_at_date,
+#                   lubridate::date(mft$date),
+#                   mft$lat,
+#                   mft$lon,
+#                   met_type,
+#                   duration_hour,
+#                   height,
+#                   SIMPLIFY = F
+#                   # mc.cores=parallel::detectCores()-1
+#                   )
+#
+#
+#   mft$trajs=trajs
+#   mft$lat = NULL
+#   mft$lon = NULL
+#
+#   return(mft)
+# }
 
 utils.frp.read.modis <- function(date){
   tryCatch({
