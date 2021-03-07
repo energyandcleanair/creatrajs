@@ -74,6 +74,8 @@ trajs.get <- function(dates,
 
     return(trajs)
   }, error=function(c){
+    print(c)
+    warning(paste("Failed to calculate trajs:",c))
     return(NA)
   })
 }
