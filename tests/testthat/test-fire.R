@@ -68,7 +68,7 @@ test_that("attaching fire - trajectories", {
       ))
 
   # Attach fire
-  mtf <- fire.attach_to_trajs(mt, buffer_km=12, duration_hour=72)
+  mtf <- fire.attach_to_trajs(mt, buffer_km=10)
 
   expect_gt(mtf$fires[[1]]$fire_count, 0)
   expect_gt(mtf$fires[[1]]$fire_frp, 0)
