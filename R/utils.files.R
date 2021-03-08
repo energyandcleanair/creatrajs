@@ -4,8 +4,8 @@
 #'
 #' @examples
 utils.get_dir_data <- function(){
-  suppressWarnings(try(readRenviron(".Renviron")))
-  suppressWarnings(try(dotenv::load_dot_env()))
+  suppressWarnings(try(readRenviron(".Renviron"), silent = T))
+  suppressWarnings(try(dotenv::load_dot_env(), silent = T))
 
   dir_data <- Sys.getenv("DIR_DATA")
   if(dir_data==""){
@@ -35,8 +35,8 @@ utils.get_cache_folder <- function(subfolder=NULL){
 
 
 utils.get_firms_folder <- function(){
-  suppressWarnings(try(readRenviron(".Renviron")))
-  suppressWarnings(try(dotenv::load_dot_env()))
+  suppressWarnings(try(readRenviron(".Renviron"), silent = T))
+  suppressWarnings(try(dotenv::load_dot_env(), silent = T))
 
   d <- Sys.getenv("DIR_FIRMS")
   if(d==""){
@@ -45,7 +45,7 @@ utils.get_firms_folder <- function(){
   return(d)
 }
 
-utils.get_firms_subfolder <- function(region="South_Asia"){
-  d <- utils.fires.get_firms_folder()
+utils.get_firms_subfolder <- function(region="Global"){
+  d <- utils.get_firms_folder()
   return(file.path(d, "suomi-npp-viirs-c2", region))
 }

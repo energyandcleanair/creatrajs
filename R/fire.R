@@ -85,6 +85,11 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
   files <- files[is.null(date_from) | (f_max_date(files) >= as.POSIXct(date_from))]
   files <- files[is.null(date_to) | (f_min_date(files) <= as.POSIXct(date_to))]
 
+  if(length(files)==0){
+    warning("No file found for the corresponding dates")
+    return(NULL)
+  }
+
   read.csv.fire <-function(f){
     tryCatch({
       # sp::over so much faster than sf (~5x)
@@ -95,10 +100,16 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
                                             "version"="character"))[,c("latitude","longitude","acq_date","frp")]
       d.coords <- cbind(d$longitude, d$latitude)
       df <- sp::SpatialPointsDataFrame(d.coords, d, proj4string=sp::CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))[c("acq_date","frp")]
-      sp::proj4string(extent.sp) <- sp::proj4string(df)
 
-      df[!is.na(sp::over(df, extent.sp)),] %>%
+      # Keep only in extent if indicated
+      if(!is.null(extent.sp)){
+        sp::proj4string(extent.sp) <- sp::proj4string(df)
+        df <- df[!is.na(sp::over(df, extent.sp)),]
+      }
+
+      df %>%
         sf::st_as_sf() # To allow bind_rows (vs rbind)
+
     }, error=function(c){
       warning(paste("Failed reading file", f))
       message(c)
@@ -130,88 +141,168 @@ fire.summary <- function(date, extent, duration_hour, f.sf){
 
 
 
-#' Join active fire data to geometry and date provided in wt
+#' Join active fire data to tibble with trajs and date column. In each row of mt, trajs should be a tibble encapsulated in a list
 #'
-#' @param wt
-#' @param one_extent_per_date Is there a different geometry for every single date
+#' @param mt
 #' @param duration_hour
 #'
 #' @return
 #' @export
 #'
-fire.attach <- function(wt,
-                        one_extent_per_date=T,
-                        duration_hour=72){
+fire.attach_to_trajs <- function(mt, buffer_km=10){
 
-  extent.sp <- sf::as_Spatial(wt$extent[!sf::st_is_empty(wt$extent)])
-  # extent.sp.union <- rgeos::gUnaryUnion(extent.sp)
+  if(!all(c("location_id", "date", "trajs") %in% names(mt))){
+    stop("wt should  contain the following columns: ",paste("location_id", "date", "trajs"))
+  }
+
+  # Split by fire date (which is different than pollution date)
+  mtf <- mt %>%
+    tidyr::unnest(trajs, names_sep=".") %>%
+    mutate(run=trajs.run) %>% # Need to keep run for buffer calculation
+    # mutate(date_fire=lubridate::date(trajs.traj_dt)) %>%
+    tidyr::nest(trajs=-c(location_id, date, run),
+                 .names_sep=".") %>%
+    rowwise() %>%
+    mutate(extent=trajs.buffer(trajs=trajs, buffer_km=buffer_km),
+           min_date_fire=min(trajs$traj_dt),
+           max_date_fire=max(trajs$traj_dt)
+           )
 
   # Read and only keep fires within extent to save memory
   print("Reading fire files")
-  f.sf <- fire.read(date_from=min(wt$date_fire),
-                               date_to=max(wt$date_fire),
-                               extent.sp=extent.sp)
+  extent.sp <- sf::as_Spatial(mtf$extent[!sf::st_is_empty(mtf$extent)])
+
+  fire.download(date_from=min(mtf$min_date_fire),
+                date_to=max(max_date_fire))
+
+  f.sf <- fire.read(date_from=min(mtf$min_date_fire),
+                    date_to=max(mtf$max_date_fire),
+                    extent.sp=extent.sp)
+  print("Done")
+
+
+  print("Attaching fire")
+  mtf$fires <- pbapply::pbmapply(
+    fire.attach_to_trajs_run,
+    trajs_run=mtf$trajs,
+    extent=mtf$extent,
+    f.sf=list(f.sf),
+    delay_hour=24,
+    SIMPLIFY = F
+  )
+  print("Done")
+
+  return(mtf)
+}
+
+#' Attach fires to a single trajectory run
+#'
+#' @param trajs_run
+#' @param f.sf
+#' @param delay_hour how "old" can a fire be to be accounted for in trajectory
+#'
+#' @return tibble of fires
+#'
+#' @examples
+fire.attach_to_trajs_run <- function(trajs_run, extent, f.sf, delay_hour=24){
+
+  if(length(unique(trajs_run$run))>1){
+    stop("This function should only be called for one trajectory run")
+  }
+
+  extent.sf <- sf::st_sfc(extent)
+  sf::st_crs(extent.sf) <- sf::st_crs(f.sf)
+
+  f.sf %>%
+    filter(acq_date <= max(trajs_run$traj_dt),
+           acq_date >= min(trajs_run$traj_dt) - lubridate::hours(delay_hour)) %>%
+    filter(nrow(.)>0 &   suppressMessages(sf::st_intersects(., extent.sf, sparse = F))) %>%
+     as.data.frame() %>%
+  select(acq_date, frp) %>%
+  full_join(trajs_run,by = character()) %>%
+  filter(as.POSIXct(acq_date, tz="UTC") <= traj_dt,
+         as.POSIXct(acq_date, tz="UTC") >= traj_dt - lubridate::hours(delay_hour)) %>%
+  group_by() %>%
+  summarise(
+    fire_frp=sum(frp, na.rm=T),
+    fire_count=dplyr::n()
+  )
+}
+
+
+
+#' Attach fire information to extents for every date. Much simpler than trajectories.
+#'
+#' @param dates
+#' @param extents
+#' @param delay_hour
+#'
+#' @return
+#' @export
+#'
+#' @examples
+fire.attach_to_extents <- function(mt,
+                                  delay_hour=72){
+
+
+  if(!all(c("location_id", "date", "extent") %in% names(mt))){
+    stop("wt should  contain the following columns: ",paste("location_id", "date", "extent"))
+  }
+
+  extent.sp <- sf::as_Spatial(mt$extent[!sf::st_is_empty(mt$extent)])
+
+  # Read and only keep fires within extent to save memory
+  print("Reading fire files")
+  f.sf <- fire.read(date_from=min(mt$date)-lubridate::hours(delay_hour),
+                    date_to=max(mt$date),
+                    extent.sp=extent.sp)
   print("Done")
 
   if(nrow(f.sf)==0){
-    print("DEBUG0")
     return(wt %>% mutate(fires=NULL))
   }
 
-  if(one_extent_per_date){
-    # Much slower, but required
-    # We do one summary per row
-    print("DEBUG1")
-    regions <- wt %>% distinct(station_id, date_meas, date_fire, extent)
+  print("Attaching fire")
+  mtf$fires <- pbapply::pbmapply(
+    fire.attach_to_extent,
+    date=mtf$date,
+    extent=mtf$extent,
+    f.sf=list(f.sf),
+    delay_hour=delay_hour,
+    SIMPLIFY = F
+  )
+  print("Done")
+
+  return(mtf)
+}
 
 
+#' Attach fires to a single extent
+#'
+#' @param trajs_run
+#' @param f.sf
+#' @param delay_hour how "old" can a fire be to be accounted for in trajectory
+#'
+#' @return tibble of fires
+#'
+#' @examples
+fire.attach_to_extent <- function(date, extent, f.sf, delay_hour){
 
-    print("Attaching fires to stations and dates")
-    regions$fires <- pbapply::pbmapply(fire.summary,
-                                       date=regions$date_fire,
-                                       extent=regions$extent,
-                                       duration_hour=duration_hour,
-                                       f.sf=list(f.sf),
-                                       SIMPLIFY=F)
-    #mc.cores = 1) # Too memory intensive otherwise -> killed ?
+  extent.sf <- sf::st_sfc(extent)
+  sf::st_crs(extent.sf) <- sf::st_crs(f.sf)
 
-
-    wtf <- wt %>% left_join(regions %>%
-                              tidyr::unnest(fires) %>%
-                              select(-c(extent))) %>%
-      select(-c(extent)) %>%
-      group_by(station_id, date=date_meas) %>%
-      # If you want to give more weight to
-      # Close fires, that'd be here probably
-      summarise(fire_frp=sum(fire_frp),
-                fire_count=sum(fire_count))
-
-    print("Done")
-
-  }else{
-    print("DEBUG3")
-    regions <- wt %>% distinct(station_id, extent)
-
-
-    # We summarize before joining, less flexible but faster
-    f.regions <- regions %>% sf::st_as_sf() %>%
-      sf::st_join(f.sf, join=sf::st_contains) %>%
-      tibble() %>%
-      group_by(station_id, date_fire=acq_date) %>%
-      summarise(frp=sum(frp, na.rm=T),
-                fire_count=dplyr::n())
-
-    # wt$date_from <- wt$date_meas - lubridate::hours(x=duration_hour)
-
-    wtf <- wt %>% dplyr::left_join(
-      f.regions %>% mutate(date_fire=lubridate::date(date_fire)),
-      by = c("station_id", "date_fire")
-    ) %>%
-      group_by(station_id, date=date_meas) %>%
-      summarise(fire_frp=sum(frp, na.rm=T),
-                fire_count=sum(fire_count, na.rm=T))
-
-  }
-
-  return(wtf)
+  f.sf %>%
+    filter(acq_date <= date,
+           acq_date >= date - lubridate::hours(delay_hour)) %>%
+    filter(nrow(.)>0 & suppressMessages(sf::st_intersects(., extent.sf, sparse = F))) %>%
+    as.data.frame() %>%
+    select(acq_date, frp) %>%
+    full_join(trajs_run,by = character()) %>%
+    filter(as.POSIXct(acq_date, tz="UTC") <= traj_dt,
+           as.POSIXct(acq_date, tz="UTC") >= traj_dt - lubridate::hours(delay_hour)) %>%
+    group_by() %>%
+    summarise(
+      fire_frp=sum(frp, na.rm=T),
+      fire_count=dplyr::n()
+    )
 }

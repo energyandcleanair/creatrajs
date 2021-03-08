@@ -3,7 +3,6 @@
 #' @param dates
 #' @param location_id
 #' @param geometry
-#' @param country
 #' @param met_type
 #' @param heights
 #' @param duration_hour
@@ -16,7 +15,6 @@
 trajs.get <- function(dates,
                       location_id,
                       geometry,
-                      country,
                       met_type,
                       heights,
                       duration_hour,
@@ -25,6 +23,10 @@ trajs.get <- function(dates,
 
   tryCatch({
     print(paste0("Calculating trajs for ", location_id))
+
+    if(length(heights)==1){
+      heights <- rep(heights, length(dates))
+    }
 
     if(!is.null(cache_folder)){
       filenames <- trajs.cache_filename(location_id, met_type, heights, duration_hour, dates)
@@ -164,3 +166,87 @@ hysplit.trajs <- function(dates, geometry, heights, duration_hour, met_type){
     return(NA)
   })
 }
+
+
+#' Create a circular buffer around a geometry
+#'
+#' @param geometry
+#' @param buffer_km
+#'
+#' @return
+#' @export
+#'
+#' @examples
+trajs.circular_extent <- function(geometry, buffer_km){
+  tryCatch({
+    sf::st_sfc(geometry, crs=4326) %>%
+      sf::st_transform(crs=3857) %>%
+      sf::st_buffer(buffer_km*1000) %>%
+      sf::st_transform(crs=4326)
+    # sf::st_bbox() %>%
+    # sf::st_as_sfc()
+  }, error=function(c){
+    return(NA)
+  })
+}
+
+
+#' Generate a "pie slice" of with a certain angle, coming
+#' from wind direction. Using wind_speed * duration to determine
+#' radius of the pie slice.
+#'
+#' @param geometry
+#' @param buffer_km
+#' @param wd The angle, measured in a clockwise direction, between true north and the direction from which
+#' the wind is blowing (wd from ISD). Calm winds if wd==0
+#'
+#' @return
+#' @export
+#'
+#' @examples
+trajs.oriented_extent <- function(geometry, duration_hour, ws, wd, width_deg=90,
+                                default_buffer_km=200,
+                                max_buffer_km=800){
+
+  st_wedge <- function(x, y, r, wd, width_deg, distance_km, n=20){
+    if(wd==0){
+      # Calm winds. We do a full circle, but reduce its buffer
+      # so that area covered is the same
+      n=n*360/width_deg
+      distance_km = distance_km * sqrt(width_deg/360)
+      width_deg=360
+    }
+
+    theta = seq(wd+180-width_deg/2, wd+180+width_deg/2, length=n) * pi/180
+    xarc = x + distance_km*1000*sin(theta)
+    yarc = y + distance_km*1000*cos(theta)
+    xc = c(x, xarc, x)
+    yc = c(y, yarc, y)
+    sf::st_polygon(list(cbind(xc,yc)))
+  }
+
+  tryCatch({
+    # ws in m per second * 10
+    distance_km <- min(ws * 3600/1000 * duration_hour / 10, max_buffer_km)
+    if(is.na(distance_km)){
+      # Probably missing wind speed
+      distance_km <- default_buffer_km
+    }
+
+    sf::st_sfc(geometry, crs=4326) %>%
+      sf::st_transform(crs=3857) %>%
+      st_wedge(x=sf::st_coordinates(.)[1],
+               y=sf::st_coordinates(.)[2],
+               wd=wd,
+               # ws is in meters per second * 10)
+               distance_km = distance_km,
+               width_deg=width_deg
+      ) %>%
+      sf::st_sfc() %>%
+      sf::st_set_crs(3857) %>%
+      sf::st_transform(crs=4326)
+  }, error=function(c){
+    return(NA)
+  })
+}
+

@@ -16,7 +16,8 @@ test_that("building trajectories work", {
   expect_equal(nrow(m), 1)
 
   # Without cache
-  t <- creatrajs::trajs.get(dates="2020-01-05",
+  date <- "2020-01-05"
+  t <- creatrajs::trajs.get(dates=date,
                  geometry = m$geometry,
                  location_id = m$location_id,
                  country = m$country,
@@ -29,6 +30,8 @@ test_that("building trajectories work", {
   expect_true(all(
     c("traj_dt","traj_dt_i","lat","lon","height","date") %in% names(t)
   ))
+
+  expect_equal(unique(lubridate::date(t$traj_dt_i)), lubridate::date(date))
 })
 
 
