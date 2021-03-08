@@ -82,7 +82,16 @@ trajs.get <- function(dates,
 
 
 
-trajs.extent <- function(trajs, buffer_km){
+#' Add a buffer
+#'
+#' @param trajs
+#' @param buffer_km
+#'
+#' @return
+#' @export
+#'
+#' @examples
+trajs.buffer <- function(trajs, buffer_km){
   tryCatch({
     suppressMessages(sf::st_as_sf(trajs, coords=c("lon","lat"), crs=4326) %>%
                        group_by(run) %>%

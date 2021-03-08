@@ -2,6 +2,7 @@
 
 export(fire.attach)
 export(fire.download)
+export(trajs.buffer)
 export(trajs.get)
 export(utils.get_cache_folder)
 importFrom(dplyr,all_vars)
