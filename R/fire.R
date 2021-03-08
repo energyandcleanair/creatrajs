@@ -46,6 +46,17 @@ fire.download <- function(date_from=NULL, date_to=NULL, region="Global"){
 
 
 
+#' Title
+#'
+#' @param date_from
+#' @param date_to
+#' @param region
+#' @param extent.sp
+#'
+#' @return
+#' @export
+#'
+#' @examples
 fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=NULL){
 
   d <- utils.get_firms_subfolder(region=region)
@@ -137,7 +148,7 @@ fire.attach <- function(wt,
 
   # Read and only keep fires within extent to save memory
   print("Reading fire files")
-  f.sf <- creatrajs::fire.read(date_from=min(wt$date_fire),
+  f.sf <- fire.read(date_from=min(wt$date_fire),
                                date_to=max(wt$date_fire),
                                extent.sp=extent.sp)
   print("Done")

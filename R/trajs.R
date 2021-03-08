@@ -27,7 +27,7 @@ trajs.get <- function(dates,
     print(paste0("Calculating trajs for ", location_id))
 
     if(!is.null(cache_folder)){
-      filenames <- trajs.cache_filename(location_id, country, met_type, heights, duration_hour, dates)
+      filenames <- trajs.cache_filename(location_id, met_type, heights, duration_hour, dates)
       filepaths <- file.path(cache_folder, filenames)
 
       filepaths.existing <- filepaths[file.exists(filepaths)]
@@ -59,7 +59,6 @@ trajs.get <- function(dates,
                  height <- heights.missing[dates.missing==date]
                  f <- file.path(cache_folder,
                                 trajs.cache_filename(location_id,
-                                                     country,
                                                      met_type,
                                                      height,
                                                      duration_hour, date))
@@ -110,9 +109,8 @@ trajs.buffer <- function(trajs, buffer_km){
 }
 
 
-trajs.cache_filename <- function(location_id, country, met_type, height, duration_hour, date){
-  paste(tolower(country),
-        tolower(location_id),
+trajs.cache_filename <- function(location_id, met_type, height, duration_hour, date){
+  paste(tolower(location_id),
         gsub("\\.","",tolower(met_type)),
         height,
         duration_hour,
