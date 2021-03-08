@@ -155,7 +155,8 @@ fire.attach_to_trajs <- function(mt, buffer_km=10){
     stop("wt should  contain the following columns: ",paste("location_id", "date", "trajs"))
   }
 
-  # Split by fire date (which is different than pollution date)
+  # Split by run
+  print("Splitting by run")
   mtf <- mt %>%
     tidyr::unnest(trajs, names_sep=".") %>%
     mutate(run=trajs.run) %>% # Need to keep run for buffer calculation
@@ -167,6 +168,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10){
            min_date_fire=min(trajs$traj_dt),
            max_date_fire=max(trajs$traj_dt)
            )
+  print("Done")
 
   # Read and only keep fires within extent to save memory
   print("Reading fire files")
