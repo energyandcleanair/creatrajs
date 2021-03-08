@@ -149,7 +149,7 @@ fire.summary <- function(date, extent, duration_hour, f.sf){
 #' @return
 #' @export
 #'
-fire.attach_to_trajs <- function(mt, buffer_km=10){
+fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
 
   if(!all(c("location_id", "date", "trajs") %in% names(mt))){
     stop("wt should  contain the following columns: ",paste("location_id", "date", "trajs"))
@@ -158,14 +158,17 @@ fire.attach_to_trajs <- function(mt, buffer_km=10){
   # Split by run
   print("Splitting by run")
   mtf <- mt %>%
-    tidyr::unnest(trajs, names_sep=".") %>%
-    mutate(run=trajs.run) %>% # Need to keep run for buffer calculation
-    # mutate(date_fire=lubridate::date(trajs.traj_dt)) %>%
-    tidyr::nest(trajs=-c(location_id, date, run),
-                 .names_sep=".") %>%
+    rowwise() %>%
+    mutate(trajs.run=list(trajs %>%
+                            mutate(run2=run) %>%
+                            group_by(run2) %>%
+                            tidyr::nest(trajs=-run2) %>%
+                            rename(run=run2))) %>%
+    select(-c(trajs)) %>%
+    tidyr::unnest(trajs.run) %>%
     rowwise() %>%
     mutate(extent=trajs.buffer(trajs=trajs, buffer_km=buffer_km),
-           min_date_fire=min(trajs$traj_dt),
+           min_date_fire=min(trajs$traj_dt)-lubridate::hours(delay_hour),
            max_date_fire=max(trajs$traj_dt)
            )
   print("Done")
@@ -175,7 +178,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10){
   extent.sp <- sf::as_Spatial(mtf$extent[!sf::st_is_empty(mtf$extent)])
 
   fire.download(date_from=min(mtf$min_date_fire),
-                date_to=max(max_date_fire))
+                date_to=max(mtf$max_date_fire))
 
   f.sf <- fire.read(date_from=min(mtf$min_date_fire),
                     date_to=max(mtf$max_date_fire),
@@ -189,7 +192,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10){
     trajs_run=mtf$trajs,
     extent=mtf$extent,
     f.sf=list(f.sf),
-    delay_hour=24,
+    delay_hour=delay_hour,
     SIMPLIFY = F
   )
   print("Done")

@@ -22,8 +22,6 @@ trajs.get <- function(dates,
                       ...){
 
   tryCatch({
-    print(paste0("Calculating trajs for ", location_id))
-
     if(length(heights)==1){
       heights <- rep(heights, length(dates))
     }
