@@ -69,7 +69,8 @@ test_that("attaching fire - trajectories", {
 
   # Attach fire
   mtf <- fire.attach_to_trajs(mt, buffer_km=10)
-
+  expect_equal(nrow(mt), nrow(mtf))
+  expect_true("fires" %in% names(mtf))
   expect_gt(mtf$fires[[1]]$fire_count, 0)
   expect_gt(mtf$fires[[1]]$fire_frp, 0)
 })

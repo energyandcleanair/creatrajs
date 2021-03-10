@@ -197,7 +197,22 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
   )
   print("Done")
 
-  return(mtf)
+  print("Regroup by day (join runs")
+  result <- mt %>%
+    left_join(
+      mtf %>%
+        tidyr::unnest(fires) %>%
+        group_by(location_id, process_id, date) %>%
+        summarise_at(c("fire_frp","fire_count"),
+                     mean,
+                     na.rm=T) %>%
+        group_by(location_id, process_id, date) %>%
+        tidyr::nest() %>%
+        rename(fires=data)
+    )
+  print("Done")
+
+  return(result)
 }
 
 #' Attach fires to a single trajectory run
