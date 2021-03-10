@@ -206,7 +206,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
         summarise_at(c("fire_frp","fire_count"),
                      mean,
                      na.rm=T) %>%
-        group_by(location_id, process_id, date) %>%
+        group_by(location_id, date) %>%
         tidyr::nest() %>%
         rename(fires=data)
     )
