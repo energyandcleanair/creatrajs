@@ -128,7 +128,7 @@ trajs.cache_filename <- function(location_id, met_type, height, duration_hour, d
 hysplit.trajs <- function(date, geometry, height, duration_hour, met_type){
 
   dir_hysplit_met <- Sys.getenv("DIR_HYSPLIT_MET", here::here(utils.get_cache_folder("weather")))
-  dir_hysplit_output <- utils.get_cache_folder("trajs/output")
+  dir_hysplit_output <- tempdir() # Important so that several computaitons can be ran simultaneously!!
   lat <- sf::st_coordinates(geometry)[2]
   lon <- sf::st_coordinates(geometry)[1]
 
