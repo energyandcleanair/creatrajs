@@ -73,7 +73,7 @@ test_that("trajectories cache system works", {
                                   met_type = "gdas1",
                                   heights = 500,
                                   duration_hour = 72,
-                                  cache_folder = utils.get_cache_folder()
+                                  cache_folder = utils.get_cache_folder("trajs")
   )
   t.duration <- Sys.time() - start
 

@@ -31,9 +31,11 @@ trajs.get <- function(dates,
       filepaths <- file.path(cache_folder, filenames)
 
       filepaths.existing <- filepaths[file.exists(filepaths)]
-      filepaths.missing <- filepaths[!file.exists(filepaths)]
-      dates.missing <- dates[!file.exists(filepaths)]
-      heights.missing <- heights[!file.exists(filepaths)]
+      filepaths.existing <- filepaths.existing[file.info(filepaths.existing)$size > 100] # NA trajs have size of 47
+
+      filepaths.missing <- filepaths[!filepaths %in% filepaths.existing]
+      dates.missing <- dates[!filepaths %in% filepaths.existing]
+      heights.missing <- heights[!filepaths %in% filepaths.existing]
     }else{
       filepaths.existing <- c()
       dates.missing <- dates
