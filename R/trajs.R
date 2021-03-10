@@ -43,28 +43,31 @@ trajs.get <- function(dates,
     trajs <- do.call("bind_rows",
                      lapply(filepaths.existing, readRDS))
 
+    # Calculate missing trajectories
     if(length(dates.missing)>0){
-      trajs.missing <- hysplit.trajs(dates.missing,
-                                     geometry=geometry,
-                                     met_type=met_type,
-                                     duration_hour=duration_hour,
-                                     heights=heights.missing)
 
-      # Save to cache
-      if(!is.null(cache_folder)){
-        trajs.missing.days <- split(trajs.missing, lubridate::date(trajs.missing$traj_dt_i))
-        lapply(names(trajs.missing.days),
-               function(date){
-                 t <- trajs.missing.days[[date]]
-                 height <- heights.missing[dates.missing==date]
-                 f <- file.path(cache_folder,
-                                trajs.cache_filename(location_id,
-                                                     met_type,
-                                                     height,
-                                                     duration_hour, date))
-                 saveRDS(t,f)
-               })
-      }
+      trajs.missing <- do.call("bind_rows",
+                               lapply(seq_along(dates.missing),
+                                      function(i){
+                                        t <- hysplit.trajs(dates.missing[i],
+                                           geometry=geometry,
+                                           met_type=met_type,
+                                           duration_hour=duration_hour,
+                                           height=heights.missing[i]
+                                         )
+
+                                        # Save to cache
+                                        if(!is.null(cache_folder)){
+                                          f <- file.path(cache_folder,
+                                                         trajs.cache_filename(location_id,
+                                                                              met_type,
+                                                                              heights.missing[i],
+                                                                              duration_hour,
+                                                                              dates.missing[i]))
+                                          saveRDS(t,f)
+                                        }
+                                        return(t)
+                                      }))
 
       # Combine all
       trajs <- bind_rows(trajs,
@@ -120,7 +123,7 @@ trajs.cache_filename <- function(location_id, met_type, height, duration_hour, d
 }
 
 
-hysplit.trajs <- function(dates, geometry, heights, duration_hour, met_type){
+hysplit.trajs <- function(date, geometry, height, duration_hour, met_type){
 
   dir_hysplit_met <- Sys.getenv("DIR_HYSPLIT_MET", here::here(utils.get_cache_folder("weather")))
   dir_hysplit_output <- utils.get_cache_folder("trajs/output")
@@ -128,26 +131,20 @@ hysplit.trajs <- function(dates, geometry, heights, duration_hour, met_type){
   lon <- sf::st_coordinates(geometry)[1]
 
   tryCatch({
-    # Probably slower to do date by date,
-    # But facing unknown issue when too many dates at a time
-    # Probably if one fails, all fail
-    trajs <- do.call("bind_rows",
-                     pbapply::pblapply(seq_along(dates),
-                                       function(i){
-                                         splitr::hysplit_trajectory(
-                                           lon = lon,
-                                           lat = lat,
-                                           height = heights[[i]],
-                                           duration = duration_hour,
-                                           days = lubridate::date(dates[[i]]),
-                                           daily_hours = c(0, 6, 12, 18),
-                                           direction = "backward",
-                                           met_type = met_type,
-                                           extended_met = F,
-                                           met_dir = dir_hysplit_met,
-                                           exec_dir = dir_hysplit_output,
-                                           clean_up = T
-                                         )}))
+    trajs <-  splitr::hysplit_trajectory(
+       lon = lon,
+       lat = lat,
+       height = height,
+       duration = duration_hour,
+       days = lubridate::date(date),
+       daily_hours = c(0, 6, 12, 18),
+       direction = "backward",
+       met_type = met_type,
+       extended_met = F,
+       met_dir = dir_hysplit_met,
+       exec_dir = dir_hysplit_output,
+       clean_up = T
+     )
 
     # Update fields to be compatible with OpenAIR
     trajs$hour.inc <- trajs$hour_along

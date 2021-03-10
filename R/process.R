@@ -1,19 +1,19 @@
 process <- function(city,
-                         source,
-                         date_from,
-                         poll=c("pm25","pm10"),
-                         date_to=lubridate::today(),
-                         met_type="gdas1",
-                         duration_hour=72,
-                         height=500,
-                         radius_km=200,
-                         buffer_km=20,
-                         fires=NULL,
-                         add_fires=F,
-                         powerplants=NULL,
-                         folder=dir_results,
-                         upload_results=F
-                         ){
+                    source,
+                    date_from,
+                    poll=c("pm25","pm10"),
+                    date_to=lubridate::today(),
+                    met_type="gdas1",
+                    duration_hour=72,
+                    height=500,
+                    radius_km=200,
+                    buffer_km=20,
+                    fires=NULL,
+                    add_fires=F,
+                    powerplants=NULL,
+                    folder=dir_results,
+                    upload_results=F
+                    ){
 
 
   # Primary data ------------------------------------------------------------

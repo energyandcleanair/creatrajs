@@ -39,6 +39,19 @@ test_that("building trajectories work", {
 
 test_that("trajectories cache system works", {
 
+  require(tictoc)
+  require(rcrea)
+  require(testthat)
+
+  m <- rcrea::measurements(city="Lahore",
+                           poll="pm25",
+                           source="openaq_government",
+                           date_from = "2020-01-01",
+                           date_to = "2020-01-01",
+                           process_id="city_day_mad",
+                           with_geometry=T
+  )
+
 
   # Run first time
   creatrajs::trajs.get(dates="2020-01-05",
@@ -64,7 +77,7 @@ test_that("trajectories cache system works", {
   )
   t.duration <- Sys.time() - start
 
-  expect_false(is.na(t.cache))
+  expect_false(length(t.cache)==1 && is.na(t.cache))
   expect_true(t.duration<1)
 
 })

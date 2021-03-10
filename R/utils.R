@@ -31,8 +31,8 @@ utils.buffer_km <- function(g, buffer_km){
     st_transform(crs=4326)
 }
 
-#
-#
+
+
 # utils.trajs_at_date <- function(date, lat, lon, met_type, duration_hour, height){
 #
 #   init_folders()
