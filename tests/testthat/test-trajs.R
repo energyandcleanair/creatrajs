@@ -85,6 +85,7 @@ test_that("parallel works", {
   expect_equal(length(trajs.parallel), length(dates))
 
 
+  # Yield same results?
   # Parallel doesn't work
   expect_equal(
     nrow(dplyr::bind_rows(trajs.noparallel)),

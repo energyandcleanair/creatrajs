@@ -168,8 +168,8 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
     tidyr::unnest(trajs.run) %>%
     rowwise() %>%
     mutate(extent=trajs.buffer(trajs=trajs, buffer_km=buffer_km),
-           min_date_fire=min(trajs$traj_dt)-lubridate::hours(delay_hour),
-           max_date_fire=max(trajs$traj_dt)
+           min_date_fire=min(trajs$traj_dt, na.rm=T)-lubridate::hours(delay_hour),
+           max_date_fire=max(trajs$traj_dt, na.rm=T)
            )
   print("Done")
 
@@ -177,11 +177,11 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
   print("Reading fire files")
   extent.sp <- sf::as_Spatial(mtf$extent[!sf::st_is_empty(mtf$extent)])
 
-  fire.download(date_from=min(mtf$min_date_fire),
-                date_to=max(mtf$max_date_fire))
+  fire.download(date_from=min(mtf$min_date_fire, na.rm=T),
+                date_to=max(mtf$max_date_fire, na.rm=T))
 
-  f.sf <- fire.read(date_from=min(mtf$min_date_fire),
-                    date_to=max(mtf$max_date_fire),
+  f.sf <- fire.read(date_from=min(mtf$min_date_fire, na.rm=T),
+                    date_to=max(mtf$max_date_fire, na.rm=T),
                     extent.sp=extent.sp)
   print("Done")
 
@@ -234,8 +234,8 @@ fire.attach_to_trajs_run <- function(trajs_run, extent, f.sf, delay_hour=24){
   sf::st_crs(extent.sf) <- sf::st_crs(f.sf)
 
   f.sf %>%
-    filter(acq_date <= max(trajs_run$traj_dt),
-           acq_date >= min(trajs_run$traj_dt) - lubridate::hours(delay_hour)) %>%
+    filter(acq_date <= max(trajs_run$traj_dt, na.rm=T),
+           acq_date >= min(trajs_run$traj_dt, na.rm=T) - lubridate::hours(delay_hour)) %>%
     filter(nrow(.)>0 &   suppressMessages(sf::st_intersects(., extent.sf, sparse = F))) %>%
      as.data.frame() %>%
   select(acq_date, frp) %>%
@@ -273,7 +273,7 @@ fire.attach_to_extents <- function(mt,
 
   # Read and only keep fires within extent to save memory
   print("Reading fire files")
-  f.sf <- fire.read(date_from=min(mt$date)-lubridate::hours(delay_hour),
+  f.sf <- fire.read(date_from=min(mt$date, na.rm=T)-lubridate::hours(delay_hour),
                     date_to=max(mt$date),
                     extent.sp=extent.sp)
   print("Done")
