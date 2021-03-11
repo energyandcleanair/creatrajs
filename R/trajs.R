@@ -23,75 +23,71 @@ trajs.get <- function(dates,
                       mc.cores=max(parallel::detectCores()-1,1),
                       ...){
 
-  tryCatch({
-    if(length(heights)==1){
-      heights <- rep(heights, length(dates))
-    }
 
-    if(!is.null(cache_folder)){
-      filenames <- trajs.cache_filename(location_id, met_type, heights, duration_hour, dates)
-      filepaths <- file.path(cache_folder, filenames)
 
-      dates.existing <- dates[file.exists(filepaths) & file.info(filepaths)$size > 100]
-      filepaths.existing <- filepaths[file.exists(filepaths) & file.info(filepaths)$size > 100] # NA trajs have size of 47
+  # Row by row
+  trajs.get.one <- function(date,
+                            location_id,
+                            geometry,
+                            met_type,
+                            height,
+                            duration_hour,
+                            cache_folder){
+    tryCatch({
 
-      filepaths.missing <- filepaths[!filepaths %in% filepaths.existing]
-      dates.missing <- dates[!filepaths %in% filepaths.existing]
-      heights.missing <- heights[!filepaths %in% filepaths.existing]
-    }else{
-      dates.existing <- c()
-      filepaths.existing <- c()
-      dates.missing <- dates
-      heights.missing <- heights
-    }
+      file.cache <- file.path(
+        cache_folder,
+        trajs.cache_filename(location_id, met_type, height, duration_hour, date))
 
-    trajs <- lapply(filepaths.existing, readRDS)
-    names(trajs) <- dates.existing
+      if(!is.null(cache_folder) &&
+         file.exists(file.cache) &&
+         file.info(file.cache)$size > 100){
+        # Cache version exists and has data
+        return(readRDS(file.cache))
+      }else{
+        # Compute trajs
+        t <- hysplit.trajs(date=date,
+                           geometry=geometry,
+                           met_type=met_type,
+                           duration_hour=duration_hour,
+                           height=height
+        )
 
-    # Calculate missing trajectories
-    if(length(dates.missing)>0){
+        if(length(t)==0 || (length(t)==1 && is.na(t))){
+          return(NA)
+        }
 
-      lapply_ <- if(parallel) function(...){pbmcapply::pbmclapply(..., mc.cores=mc.cores)} else pbapply::pblapply
+        # Save to cache
+        if(!is.null(cache_folder)){
+          saveRDS(t,file.cache)
+        }
+        return(t)
+      }}, error=function(c){
+        print(c)
+        warning(paste("Failed to calculate trajs:", c))
+        return(NA)
+      })
+  }
 
-      trajs.missing<- lapply_(
-        seq_along(dates.missing),
-        function(i){
-          t <- hysplit.trajs(dates.missing[i],
-                             geometry=geometry,
-                             met_type=met_type,
-                             duration_hour=duration_hour,
-                             height=heights.missing[i]
-          )
+  # Run all of them
+  mapply_ <- if(parallel) function(...){pbmcapply::pbmcmapply(..., mc.cores=mc.cores)} else pbapply::pbmapply
 
-          if(length(t)==0 || (length(t)==1 && is.na(t))){
-            return(tibble::tibble()) # For bind rows to work
-          }
+  if(is.null(cache_folder)){
+    cache_folder <- list(cache_folder)
+  }
 
-          # Save to cache
-          if(!is.null(cache_folder)){
-            f <- file.path(cache_folder,
-                           trajs.cache_filename(location_id,
-                                                met_type,
-                                                heights.missing[i],
-                                                duration_hour,
-                                                dates.missing[i]))
-            saveRDS(t,f)
-          }
-          return(t)
-        })
+  trajs<- mapply_(
+    trajs.get.one,
+    date=dates,
+    location_id=location_id,
+    geometry=geometry,
+    met_type=met_type,
+    height=heights,
+    duration_hour=duration_hour,
+    cache_folder=cache_folder,
+    SIMPLIFY=F)
 
-        names(trajs.missing) <- dates.missing
-
-        # Combine all
-        trajs <- c(trajs, trajs.missing)
-    }
-
-    return(trajs[as.character(dates)])
-  }, error=function(c){
-    print(c)
-    warning(paste("Failed to calculate trajs:", c))
-    return(NA)
-  })
+  return(trajs)
 }
 
 

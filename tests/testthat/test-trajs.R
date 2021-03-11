@@ -68,7 +68,6 @@ test_that("parallel works", {
   )
   t.duration.noparallel <- Sys.time() - start
   expect_equal(length(trajs.noparallel), length(dates))
-  expect_equal(names(trajs.noparallel), as.character(dates))
 
   # Run parallel
   start <- Sys.time()
@@ -84,7 +83,6 @@ test_that("parallel works", {
   )
   t.duration.parallel <- Sys.time() - start
   expect_equal(length(trajs.parallel), length(dates))
-  expect_equal(names(trajs.parallel), as.character(dates))
 
 
   # Parallel doesn't work
@@ -96,6 +94,50 @@ test_that("parallel works", {
 
 })
 
+
+
+test_that("vectorization works", {
+
+  require(rcrea)
+  require(testthat)
+
+  date_from = "2020-01-04"
+  date_to = "2020-01-06"
+  dates = seq.Date(as.Date(date_from), as.Date(date_to), by="day")
+
+  m <- rcrea::measurements(city=c("Delhi","Hyderabad"),
+                           poll="pm25",
+                           source="cpcb",
+                           date_from = date_from,
+                           date_to = date_to,
+                           process_id="city_day_mad",
+                           with_geometry=T
+  )
+
+  expect_equal(
+    nrow(m),
+    2*length(dates)
+  )
+
+  trajs <- creatrajs::trajs.get(dates=m$date,
+                                 geometry = m$geometry,
+                                 location_id = m$location_id,
+                                 country = m$country,
+                                 met_type = "gdas1",
+                                 heights = 500,
+                                 duration_hour = 72,
+                                 cache_folder = NULL,
+                                 parallel=F
+  )
+
+  # Test that trajectories correspond to the right geometry
+  for(i in seq(1, nrow(m))){
+    expect_equal(
+      round(trajs[[i]]$lon[1],3),
+      round(sf::st_coordinates(m$geometry[i])[1],3))
+  }
+
+})
 
 test_that("trajectories cache system works", {
 
