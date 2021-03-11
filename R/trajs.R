@@ -42,7 +42,16 @@ trajs.get <- function(dates,
       heights.missing <- heights
     }
 
-    trajs <- do.call("bind_rows",
+    bind_rows_quiet <- function(x,...){
+      x <- x[!is.na(x)]
+      if(length(x)==0){
+        return(NA)
+      }else{
+        return(bind_rows(x,...))
+      }
+    }
+
+    trajs <- do.call("bind_rows_quiet",
                      lapply(filepaths.existing, readRDS))
 
     # Calculate missing trajectories
