@@ -22,7 +22,9 @@ Imports:
     pbapply,
     fuzzyjoin,
     googleCloudStorageR,
-    parallel
+    parallel,
+    pbapply,
+    pbmcapply
 Depends:
     ggplot2,
     ggmap

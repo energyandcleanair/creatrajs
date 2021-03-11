@@ -8,7 +8,7 @@
 #' @param duration_hour
 #' @param ...
 #'
-#' @return tibble of trajectories
+#' @return list of tibble of trajectories (named by dates)
 #' @export
 #'
 #' @examples
@@ -19,6 +19,8 @@ trajs.get <- function(dates,
                       heights,
                       duration_hour,
                       cache_folder=NULL,
+                      parallel=F, # NOT TOTALLY WORKING YET (weather download at least is an issue)
+                      mc.cores=max(parallel::detectCores()-1,1),
                       ...){
 
   tryCatch({
@@ -30,62 +32,61 @@ trajs.get <- function(dates,
       filenames <- trajs.cache_filename(location_id, met_type, heights, duration_hour, dates)
       filepaths <- file.path(cache_folder, filenames)
 
-      filepaths.existing <- filepaths[file.exists(filepaths)]
-      filepaths.existing <- filepaths.existing[file.info(filepaths.existing)$size > 100] # NA trajs have size of 47
+      dates.existing <- dates[file.exists(filepaths) && file.info(filepaths)$size > 100]
+      filepaths.existing <- filepaths[file.exists(filepaths) && file.info(filepaths)$size > 100] # NA trajs have size of 47
 
       filepaths.missing <- filepaths[!filepaths %in% filepaths.existing]
       dates.missing <- dates[!filepaths %in% filepaths.existing]
       heights.missing <- heights[!filepaths %in% filepaths.existing]
     }else{
+      dates.existing <- c()
       filepaths.existing <- c()
       dates.missing <- dates
       heights.missing <- heights
     }
 
-    bind_rows_quiet <- function(x,...){
-      x <- x[!is.na(x)]
-      if(length(x)==0){
-        return(NA)
-      }else{
-        return(bind_rows(x,...))
-      }
-    }
-
-    trajs <- do.call("bind_rows_quiet",
-                     lapply(filepaths.existing, readRDS))
+    trajs <- lapply(filepaths.existing, readRDS)
+    names(trajs) <- dates.existing
 
     # Calculate missing trajectories
     if(length(dates.missing)>0){
 
-      trajs.missing <- do.call("bind_rows_quiet",
-                               lapply(seq_along(dates.missing),
-                                      function(i){
-                                        t <- hysplit.trajs(dates.missing[i],
-                                           geometry=geometry,
-                                           met_type=met_type,
-                                           duration_hour=duration_hour,
-                                           height=heights.missing[i]
-                                         )
+      lapply_ <- if(parallel) function(...){pbmcapply::pbmclapply(..., mc.cores=mc.cores)} else pbapply::pblapply
 
-                                        # Save to cache
-                                        if(!is.null(cache_folder)){
-                                          f <- file.path(cache_folder,
-                                                         trajs.cache_filename(location_id,
-                                                                              met_type,
-                                                                              heights.missing[i],
-                                                                              duration_hour,
-                                                                              dates.missing[i]))
-                                          saveRDS(t,f)
-                                        }
-                                        return(t)
-                                      }))
+      trajs.missing<- lapply_(
+        seq_along(dates.missing),
+        function(i){
+          t <- hysplit.trajs(dates.missing[i],
+                             geometry=geometry,
+                             met_type=met_type,
+                             duration_hour=duration_hour,
+                             height=heights.missing[i]
+          )
 
-      # Combine all
-      trajs <- bind_rows(trajs,
-                         trajs.missing)
+          if(length(t)==0 || (length(t)==1 && is.na(t))){
+            return(tibble::tibble()) # For bind rows to work
+          }
+
+          # Save to cache
+          if(!is.null(cache_folder)){
+            f <- file.path(cache_folder,
+                           trajs.cache_filename(location_id,
+                                                met_type,
+                                                heights.missing[i],
+                                                duration_hour,
+                                                dates.missing[i]))
+            saveRDS(t,f)
+          }
+          return(t)
+        })
+
+        names(trajs.missing) <- dates.missing
+
+        # Combine all
+        trajs <- c(trajs, trajs.missing)
     }
 
-    return(trajs)
+    return(trajs[as.character(dates)])
   }, error=function(c){
     print(c)
     warning(paste("Failed to calculate trajs:", c))

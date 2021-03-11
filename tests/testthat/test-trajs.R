@@ -1,6 +1,6 @@
 test_that("building trajectories work", {
 
-  require(tictoc)
+
   require(rcrea)
   require(testthat)
 
@@ -35,6 +35,66 @@ test_that("building trajectories work", {
 })
 
 
+test_that("parallel works", {
+
+  require(tictoc)
+  require(rcrea)
+  require(testthat)
+
+  date_from = "2020-01-04"
+  date_to = "2020-01-10"
+  dates = seq.Date(as.Date(date_from), as.Date(date_to), by="day")
+
+  m <- rcrea::measurements(city="Lahore",
+                           poll="pm25",
+                           source="openaq_government",
+                           date_from = date_from,
+                           date_to = date_to,
+                           process_id="city_day_mad",
+                           with_geometry=T
+  )
+
+  # Run no parallel
+  start <- Sys.time()
+  trajs.noparallel <- creatrajs::trajs.get(dates=dates,
+                                           geometry = m$geometry,
+                                           location_id = m$location_id,
+                                           country = m$country,
+                                           met_type = "gdas1",
+                                           heights = 500,
+                                           duration_hour = 72,
+                                           cache_folder = NULL,
+                                           parallel=F
+  )
+  t.duration.noparallel <- Sys.time() - start
+  expect_equal(length(trajs.noparallel), length(dates))
+  expect_equal(names(trajs.noparallel), as.character(dates))
+
+  # Run parallel
+  start <- Sys.time()
+  trajs.parallel <- creatrajs::trajs.get(dates=seq.Date(as.Date(date_from),as.Date(date_to),by="day"),
+                       geometry = m$geometry,
+                       location_id = m$location_id,
+                       country = m$country,
+                       met_type = "gdas1",
+                       heights = 500,
+                       duration_hour = 72,
+                       cache_folder = NULL,
+                       parallel=T
+  )
+  t.duration.parallel <- Sys.time() - start
+  expect_equal(length(trajs.parallel), length(dates))
+  expect_equal(names(trajs.parallel), as.character(dates))
+
+
+  # Parallel doesn't work
+  expect_equal(
+    nrow(dplyr::bind_rows(trajs.noparallel)),
+    nrow(dplyr::bind_rows(trajs.parallel))
+  )
+
+
+})
 
 
 test_that("trajectories cache system works", {
