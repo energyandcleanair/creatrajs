@@ -57,7 +57,7 @@ trajs.get <- function(dates,
     # Calculate missing trajectories
     if(length(dates.missing)>0){
 
-      trajs.missing <- do.call("bind_rows",
+      trajs.missing <- do.call("bind_rows_quiet",
                                lapply(seq_along(dates.missing),
                                       function(i){
                                         t <- hysplit.trajs(dates.missing[i],
