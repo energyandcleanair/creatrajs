@@ -185,6 +185,10 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
                     extent.sp=extent.sp)
   print("Done")
 
+  if(nrow(f.sf)==0){
+    warning("No fire found. Something's probably wrong")
+  }
+
 
   print("Attaching fire")
   mtf$fires <- pbapply::pbmapply(

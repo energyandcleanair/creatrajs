@@ -1,3 +1,25 @@
+#' Calculate and export plots of trajectories
+#'
+#' @param city
+#' @param source
+#' @param date_from
+#' @param poll
+#' @param date_to
+#' @param met_type
+#' @param duration_hour
+#' @param height
+#' @param radius_km
+#' @param buffer_km
+#' @param fires
+#' @param add_fires
+#' @param powerplants
+#' @param folder
+#' @param upload_results
+#'
+#' @return
+#' @export
+#'
+#' @examples
 process <- function(city,
                     source,
                     date_from,
@@ -8,6 +30,7 @@ process <- function(city,
                     height=500,
                     radius_km=200,
                     buffer_km=20,
+                    zoom_level=8,
                     fires=NULL,
                     add_fires=F,
                     powerplants=NULL,
@@ -58,10 +81,19 @@ process <- function(city,
 
 
   # Trajectories ------------------------------------------------------------
-  mft <- utils.attach.trajs(mf, met_type=met_type, duration_hour=duration_hour, height=height)
+  mf$trajs <- trajs.get(dates=mf$date,
+                   location_id=mf$location_id,
+                   geometry=mf$geometry,
+                   met_type=met_type,
+                   duration_hour=duration_hour,
+                   heights=height)
 
   # Only keep days with trajectories
-  mft <- mft  %>% filter(!is.na(trajs) && nrow(trajs)>0)
+  mf <- mf %>%
+    dplyr::filter(!is.na(trajs)) %>%
+    rowwise() %>%
+    dplyr::filter(nrow(trajs)>0) %>%
+    ungroup()
 
 
   # Fire Radiative Power ----------------------------------------------------------
@@ -69,8 +101,8 @@ process <- function(city,
 
 
   # Plot --------------------------------------------------------------------
-  mftb <- mft %>% utils.attach.basemaps(radius_km=radius_km, zoom_level=10)
-  mftb.plotted <- mftb %>%
+  mf <- mf %>% utils.attach.basemaps(radius_km=radius_km, zoom_level=zoom_level)
+  mf.plotted <- mf %>%
     rowwise() %>%
     mutate(filename=paste("map.trajs-fire-power",
                           gsub("-","",date),

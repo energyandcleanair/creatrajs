@@ -213,11 +213,11 @@ utils.attach.basemaps <- function(m, radius_km=100, zoom_level=6){
 
     tryCatch({
       bbox_100km <- g %>%
-        st_set_crs(4326) %>%
-        st_transform(crs=3857) %>%
-        st_buffer(radius_km*1000) %>%
-        st_transform(crs=4326) %>%
-        st_bbox()
+        sf::st_set_crs(4326) %>%
+        sf::st_transform(crs=3857) %>%
+        sf::st_buffer(radius_km*1000) %>%
+        sf::st_transform(crs=4326) %>%
+        sf::st_bbox()
       ggmap::get_map(location=unname(bbox_100km),zoom=zoom_level,
                      source="stamen", terrain="terrain")
     }, error=function(err){
