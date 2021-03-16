@@ -18,6 +18,7 @@ trajs.get <- function(dates,
                       met_type,
                       heights,
                       duration_hour,
+                      timezone="UTC",
                       cache_folder=NULL,
                       parallel=F, # NOT TOTALLY WORKING YET (weather download at least is an issue)
                       mc.cores=max(parallel::detectCores()-1,1),
@@ -32,6 +33,7 @@ trajs.get <- function(dates,
                             met_type,
                             height,
                             duration_hour,
+                            timezone,
                             cache_folder){
     tryCatch({
 
@@ -50,7 +52,8 @@ trajs.get <- function(dates,
                            geometry=geometry,
                            met_type=met_type,
                            duration_hour=duration_hour,
-                           height=height
+                           height=height,
+                           timezone=timezone
         )
 
         if(length(t)==0 || (length(t)==1 && is.na(t))){
@@ -84,6 +87,7 @@ trajs.get <- function(dates,
     met_type=met_type,
     height=heights,
     duration_hour=duration_hour,
+    timezone=timezone,
     cache_folder=cache_folder,
     SIMPLIFY=F)
 
@@ -131,34 +135,43 @@ trajs.cache_filename <- function(location_id, met_type, height, duration_hour, d
 }
 
 
-hysplit.trajs <- function(date, geometry, height, duration_hour, met_type){
+hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timezone="UTC"){
 
   dir_hysplit_met <- Sys.getenv("DIR_HYSPLIT_MET", here::here(utils.get_cache_folder("weather")))
   dir_hysplit_output <- tempdir() # Important so that several computaitons can be ran simultaneously!!
   lat <- sf::st_coordinates(geometry)[2]
   lon <- sf::st_coordinates(geometry)[1]
 
+  # Build date/hour combinations in UTC
+  hours <- c(0, 6, 12, 18)
+  date_hours <- (as.POSIXct(date) + lubridate::hours(hours)) %>%
+    lubridate::force_tz(timezone) %>%
+    lubridate::with_tz("UTC")
+
   tryCatch({
-    trajs <-  splitr::hysplit_trajectory(
-       lon = lon,
-       lat = lat,
-       height = height,
-       duration = duration_hour,
-       days = lubridate::date(date),
-       daily_hours = c(0, 6, 12, 18),
-       direction = "backward",
-       met_type = met_type,
-       extended_met = F,
-       met_dir = dir_hysplit_met,
-       exec_dir = dir_hysplit_output,
-       clean_up = T
-     )
+    trajs <-  do.call("bind_rows",
+                      lapply(split(date_hours, lubridate::date(date_hours)),
+                             function(date_hours){
+                               splitr::hysplit_trajectory(
+                                 lon = lon,
+                                 lat = lat,
+                                 height = height,
+                                 duration = duration_hour,
+                                 days = unique(lubridate::date(date_hours)),
+                                 daily_hours = lubridate::hour(date_hours),
+                                 direction = "backward",
+                                 met_type = met_type,
+                                 extended_met = F,
+                                 met_dir = dir_hysplit_met,
+                                 exec_dir = dir_hysplit_output,
+                                 clean_up = T)
+                             }))
 
     # Update fields to be compatible with OpenAIR
     trajs$hour.inc <- trajs$hour_along
     trajs$date <- trajs$traj_dt_i
-    trajs$date2 <- trajs$traj_dt
-    trajs$year <- lubridate::year(trajs$traj_dt_i)
+    trajs$date_particle <- trajs$traj_dt
+    trajs$year <- lubridate::year(date$traj_dt_i)
     trajs$month <- lubridate::month(trajs$traj_dt_i)
     trajs$day <- lubridate::date(trajs$traj_dt_i)
 
