@@ -171,7 +171,7 @@ hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timez
     trajs$hour.inc <- trajs$hour_along
     trajs$date <- trajs$traj_dt_i
     trajs$date_particle <- trajs$traj_dt
-    trajs$year <- lubridate::year(date$traj_dt_i)
+    trajs$year <- lubridate::year(trajs$traj_dt_i)
     trajs$month <- lubridate::month(trajs$traj_dt_i)
     trajs$day <- lubridate::date(trajs$traj_dt_i)
 
