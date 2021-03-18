@@ -144,28 +144,23 @@ hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timez
 
   # Build date/hour combinations in UTC
   hours <- c(0, 6, 12, 18)
-  date_hours <- (as.POSIXct(date) + lubridate::hours(hours)) %>%
-    lubridate::force_tz(timezone) %>%
-    lubridate::with_tz("UTC")
+  offset <- as.double(as.POSIXct(date,tz=timezone)-as.POSIXct(date,tz="UTC"), units="hours")
+  hours_utc <- hours + offset
 
   tryCatch({
-    trajs <-  do.call("bind_rows",
-                      lapply(split(date_hours, lubridate::date(date_hours)),
-                             function(date_hours){
-                               splitr::hysplit_trajectory(
+    trajs <- splitr::hysplit_trajectory(
                                  lon = lon,
                                  lat = lat,
                                  height = height,
                                  duration = duration_hour,
-                                 days = unique(lubridate::date(date_hours)),
-                                 daily_hours = lubridate::hour(date_hours),
+                                 days = as.Date(date),
+                                 daily_hours = hours_utc, #It accepts negative hours
                                  direction = "backward",
                                  met_type = met_type,
                                  extended_met = F,
                                  met_dir = dir_hysplit_met,
                                  exec_dir = dir_hysplit_output,
                                  clean_up = T)
-                             }))
 
     # Update fields to be compatible with OpenAIR
     trajs$hour.inc <- trajs$hour_along
