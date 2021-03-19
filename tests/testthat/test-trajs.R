@@ -184,4 +184,3 @@ test_that("trajectories cache system works", {
   expect_true(t.duration<1)
 
 })
-

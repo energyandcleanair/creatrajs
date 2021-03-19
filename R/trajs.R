@@ -109,7 +109,8 @@ trajs.buffer <- function(trajs, buffer_km){
   tryCatch({
     suppressMessages(sf::st_as_sf(trajs, coords=c("lon","lat"), crs=4326) %>%
                        group_by(run) %>%
-                       summarise() %>%
+                       arrange(traj_dt) %>%
+                       summarise(do_union = FALSE) %>%
                        sf::st_cast("LINESTRING") %>%
                        sf::st_transform(crs=3857) %>%
                        sf::st_buffer(buffer_km*1000) %>%

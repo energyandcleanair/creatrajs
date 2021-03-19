@@ -56,7 +56,7 @@ test_that("attaching fire - trajectories", {
   # Get trajectories
   mt <- m %>%
     rowwise() %>%
-    mutate(trajs=list(
+    mutate(trajs=
       creatrajs::trajs.get(dates=date,
                             geometry = geometry,
                             location_id = location_id,
@@ -65,7 +65,7 @@ test_that("attaching fire - trajectories", {
                             duration_hour = 72,
                             cache_folder = utils.get_cache_folder("trajs")
                            )
-      ))
+      )
 
   # Attach fire
   mtf <- fire.attach_to_trajs(mt, buffer_km=10)

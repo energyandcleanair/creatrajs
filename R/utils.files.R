@@ -3,6 +3,7 @@
 #' @return Local path to data folder
 #'
 #' @examples
+#' @export
 utils.get_dir_data <- function(){
   suppressWarnings(try(readRenviron(".Renviron"), silent = T))
   suppressWarnings(try(dotenv::load_dot_env(), silent = T))
@@ -34,6 +35,12 @@ utils.get_cache_folder <- function(subfolder=NULL){
 }
 
 
+#' Firms folder
+#'
+#' @return
+#' @export
+#'
+#' @examples
 utils.get_firms_folder <- function(){
   suppressWarnings(try(readRenviron(".Renviron"), silent = T))
   suppressWarnings(try(dotenv::load_dot_env(), silent = T))
@@ -45,6 +52,15 @@ utils.get_firms_folder <- function(){
   return(d)
 }
 
+
+#' Region subfolder of Firms folder
+#'
+#' @param region
+#'
+#' @return
+#' @export
+#'
+#' @examples
 utils.get_firms_subfolder <- function(region="Global"){
   d <- utils.get_firms_folder()
   return(file.path(d, "suomi-npp-viirs-c2", region))
