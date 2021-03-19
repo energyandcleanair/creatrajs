@@ -57,7 +57,7 @@ fire.download <- function(date_from=NULL, date_to=NULL, region="Global"){
 #' @export
 #'
 #' @examples
-fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=NULL){
+fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=NULL, show.progress=T){
 
   d <- utils.get_firms_subfolder(region=region)
 
@@ -117,8 +117,9 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
     })
   }
 
+  lapply_ <- ifelse(show.progress, pbmcapply::pbmclapply, parallel::mclapply)
   fires <- do.call("bind_rows",
-                   pbmcapply::pbmclapply(sort(files[!is.na(files)]), # Sort to read fire_global* first
+                   lapply_(sort(files[!is.na(files)]), # Sort to read fire_global* first
                                          read.csv.fire,
                                          mc.cores = parallel::detectCores()-1))
   fires
@@ -173,33 +174,40 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
            )
   print("Done")
 
-  # Read and only keep fires within extent to save memory
-  print("Reading fire files")
-  extent.sp <- sf::as_Spatial(mtf$extent[!sf::st_is_empty(mtf$extent)])
-
+  print("Downloading fires")
   fire.download(date_from=min(mtf$min_date_fire, na.rm=T),
                 date_to=max(mtf$max_date_fire, na.rm=T))
-
-  f.sf <- fire.read(date_from=min(mtf$min_date_fire, na.rm=T),
-                    date_to=max(mtf$max_date_fire, na.rm=T),
-                    extent.sp=extent.sp)
   print("Done")
+  # Read and only keep fires within extent to save memory
+  # And per year (or month)
+  date_group_fn <- lubridate::month # Can be year, month, or even date (lot of redundancy in the latter case)
+  mtf$date_group <- date_group_fn(mtf$max_date_fire)
 
-  if(nrow(f.sf)==0){
-    warning("No fire found. Something's probably wrong")
-  }
+  print("Attaching fires (month by month)")
+  mtf <- pbapply::pblapply(base::split(mtf, mtf$date_group),
+         function(mtf){
 
+           extent.sp <- sf::as_Spatial(mtf$extent[!sf::st_is_empty(mtf$extent)])
+           f.sf <- fire.read(date_from=min(mtf$min_date_fire, na.rm=T),
+                             date_to=max(mtf$max_date_fire, na.rm=T),
+                             extent.sp=extent.sp,
+                             show.progress=F)
 
-  print("Attaching fire")
-  mtf$fires <- pbapply::pbmapply(
-    fire.attach_to_trajs_run,
-    trajs_run=mtf$trajs,
-    extent=mtf$extent,
-    f.sf=list(f.sf),
-    delay_hour=delay_hour,
-    SIMPLIFY = F
-  )
-  print("Done")
+           # if(nrow(f.sf)==0){
+           #   warning("No fire found. Something's probably wrong")
+           # }
+
+           mtf$fires <- mapply(
+             fire.attach_to_trajs_run,
+             trajs_run=mtf$trajs,
+             extent=mtf$extent,
+             f.sf=list(f.sf),
+             delay_hour=delay_hour,
+             SIMPLIFY = F
+           )
+           return(mtf)
+         }) %>%
+    do.call(bind_rows,.)
 
   print("Regroup by day (join runs")
   result <- mt %>%
