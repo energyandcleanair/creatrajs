@@ -338,3 +338,94 @@ fire.attach_to_extent <- function(date, extent, f.sf, delay_hour){
       fire_count=dplyr::n()
     )
 }
+
+
+
+#' Join active fire data to tibble with dispersion raster and date column. In each row of mt, trajs should be a tibble encapsulated in a list
+#'
+#' @param mt
+#' @param duration_hour
+#'
+#' @return
+#' @export
+#'
+fire.attach_to_disps <- function(mt, buffer_km=10, delay_hour=24){
+
+  if(!all(c("location_id", "date", "disps") %in% names(mt))){
+    stop("wt should  contain the following columns: ",paste("location_id", "date", "disps"))
+  }
+
+
+
+
+
+  # Split by run
+  print("Splitting by run")
+  mtf <- mt %>%
+    rowwise() %>%
+    mutate(trajs.run=list(trajs %>%
+                            mutate(run2=run) %>%
+                            group_by(run2) %>%
+                            tidyr::nest(trajs=-run2) %>%
+                            rename(run=run2))) %>%
+    select(-c(trajs)) %>%
+    tidyr::unnest(trajs.run) %>%
+    rowwise() %>%
+    mutate(extent=trajs.buffer(trajs=trajs, buffer_km=buffer_km),
+           min_date_fire=min(trajs$traj_dt, na.rm=T)-lubridate::hours(delay_hour),
+           max_date_fire=max(trajs$traj_dt, na.rm=T)
+    )
+  print("Done")
+
+  print("Downloading fires")
+  fire.download(date_from=min(mtf$min_date_fire, na.rm=T),
+                date_to=max(mtf$max_date_fire, na.rm=T))
+  print("Done")
+  # Read and only keep fires within extent to save memory
+  # And per year (or month)
+  date_group_fn <- lubridate::month # Can be year, month, or even date (lot of redundancy in the latter case)
+  mtf$date_group <- date_group_fn(mtf$max_date_fire)
+
+  print("Attaching fires (month by month)")
+  mtf <- pbapply::pblapply(base::split(mtf, mtf$date_group),
+                           function(mtf){
+
+                             extent.sp <- sf::as_Spatial(mtf$extent[!sf::st_is_empty(mtf$extent)])
+                             f.sf <- fire.read(date_from=min(mtf$min_date_fire, na.rm=T),
+                                               date_to=max(mtf$max_date_fire, na.rm=T),
+                                               extent.sp=extent.sp,
+                                               show.progress=F)
+
+                             # if(nrow(f.sf)==0){
+                             #   warning("No fire found. Something's probably wrong")
+                             # }
+
+                             mtf$fires <- mapply(
+                               fire.attach_to_trajs_run,
+                               trajs_run=mtf$trajs,
+                               extent=mtf$extent,
+                               f.sf=list(f.sf),
+                               delay_hour=delay_hour,
+                               SIMPLIFY = F
+                             )
+                             return(mtf)
+                           }) %>%
+    do.call(bind_rows,.)
+
+  print("Regroup by day (join runs")
+  result <- mt %>%
+    left_join(
+      mtf %>%
+        tidyr::unnest(fires) %>%
+        group_by(location_id, date) %>%
+        summarise_at(c("fire_frp","fire_count"),
+                     mean,
+                     na.rm=T) %>%
+        group_by(location_id, date) %>%
+        tidyr::nest() %>%
+        rename(fires=data)
+    )
+  print("Done")
+
+  return(result)
+}
