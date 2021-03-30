@@ -1,8 +1,33 @@
 
 
-map.trajs <- function(basemap, fires, trajs, location_id, location_name, date,
-                      meas, filename, met_type, duration_hour, height, add_fires,
-                      fire_raster=NULL, powerplants=NULL, add_plot=NULL, folder=dir_results, ...){
+#' Map trajectories
+#'
+#' @param trajs
+#' @param location_id
+#' @param location_name
+#' @param date
+#' @param meas
+#' @param filename
+#' @param met_type
+#' @param duration_hour
+#' @param height
+#' @param fires
+#' @param basemap
+#' @param add_fires
+#' @param fire_raster
+#' @param powerplants
+#' @param add_plot
+#' @param folder
+#' @param ...
+#'
+#' @return
+#' @export
+#'
+#' @examples
+map.trajs <- function(trajs, location_id, location_name, date,
+                      meas, filename, met_type, duration_hour, height,
+                      fires=NULL, basemap=NULL,
+                      add_fires=F, fire_raster=NULL, powerplants=NULL, add_plot=NULL, ...){
 
   if(!is.null(powerplants)){
     powerplants$geometry <- st_centroid(powerplants$geometry)
@@ -133,14 +158,12 @@ map.trajs <- function(basemap, fires, trajs, location_id, location_name, date,
     }
 
 
-    filepath <- file.path(folder, paste0(filename,".jpg"))
-    dir.create(folder, showWarnings = F)
     ggsave(plot=m,
-           filename=filepath,
+           filename = filename,
            width=8,
            height=7)
 
-    return(filepath)
+    return(filename)
   }, error=function(c){
     warning(paste("Error on  ", location_id, date))
     return(NA)

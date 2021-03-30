@@ -201,6 +201,16 @@ utils.attach.frp.raster<- function(mft, buffer_km, duration_hour){
 
 
 
+#' Attach basemap to every single row of m
+#'
+#' @param m
+#' @param radius_km
+#' @param zoom_level
+#'
+#' @return
+#' @export
+#'
+#' @examples
 utils.attach.basemaps <- function(m, radius_km=100, zoom_level=6){
 
   utils.ggmap_register()
@@ -209,31 +219,31 @@ utils.attach.basemaps <- function(m, radius_km=100, zoom_level=6){
     distinct(location_id, geometry) %>%
     filter(!sf::st_is_empty(geometry))
 
-  geometry_to_basemap <- function(g, radius_km, zoom_level){
-
-    tryCatch({
-      bbox_100km <- g %>%
-        sf::st_set_crs(4326) %>%
-        sf::st_transform(crs=3857) %>%
-        sf::st_buffer(radius_km*1000) %>%
-        sf::st_transform(crs=4326) %>%
-        sf::st_bbox()
-      ggmap::get_map(location=unname(bbox_100km),zoom=zoom_level,
-                     source="stamen", terrain="terrain")
-    }, error=function(err){
-      print("Failed to build basemap")
-      print(g)
-      return(NA)
-    })
-  }
-
   basemaps <- mc %>%
     rowwise() %>%
-    mutate(basemap = list(geometry_to_basemap(geometry, radius_km, zoom_level))) %>%
+    mutate(basemap = list(utils.geometry_to_basemap(geometry, radius_km, zoom_level))) %>%
     filter(!all(is.na(basemap)))
 
   return(m %>% left_join(basemaps))
 
+}
+
+utils.geometry_to_basemap <- function(g, radius_km, zoom_level){
+
+  tryCatch({
+    bbox_100km <- g %>%
+      sf::st_set_crs(4326) %>%
+      sf::st_transform(crs=3857) %>%
+      sf::st_buffer(radius_km*1000) %>%
+      sf::st_transform(crs=4326) %>%
+      sf::st_bbox()
+    ggmap::get_map(location=unname(bbox_100km),zoom=zoom_level,
+                   source="stamen", terrain="terrain")
+  }, error=function(err){
+    print("Failed to build basemap")
+    print(g)
+    return(NA)
+  })
 }
 
 utils.save.meta <- function(filename, date, meas, fires, country, location_id, met_type, duration_hour, height, folder=dir_results, ...){
