@@ -165,7 +165,7 @@ map.trajs <- function(trajs, location_id, location_name, date,
 
     return(filename)
   }, error=function(c){
-    warning(paste("Error on  ", location_id, date))
+    warning(paste("Error on  ", location_id, date, c))
     return(NA)
   })
 }
