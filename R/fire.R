@@ -168,6 +168,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
     select(-c(trajs)) %>%
     tidyr::unnest(trajs.run) %>%
     rowwise() %>%
+    filter(nrow(trajs)>1) %>%
     mutate(extent=trajs.buffer(trajs=trajs, buffer_km=buffer_km),
            min_date_fire=min(trajs$traj_dt, na.rm=T)-lubridate::hours(delay_hour),
            max_date_fire=max(trajs$traj_dt, na.rm=T)
@@ -180,7 +181,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
   print("Done")
   # Read and only keep fires within extent to save memory
   # And per year (or month)
-  date_group_fn <- lubridate::month # Can be year, month, or even date (lot of redundancy in the latter case)
+  date_group_fn <- function(x) strftime(x,"%Y%m") # Can be year, month, or even date (lot of redundancy in the latter case)
   mtf$date_group <- date_group_fn(mtf$max_date_fire)
 
   print("Attaching fires (month by month)")
@@ -188,7 +189,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
          function(mtf){
 
            extent.sp <- sf::as_Spatial(mtf$extent[!sf::st_is_empty(mtf$extent)])
-           f.sf <- fire.read(date_from=min(mtf$min_date_fire, na.rm=T),
+           f.sf <- fire.read(date_from=min(mtf$min_date_fire, na.rm=T)-lubridate::days(1),
                              date_to=max(mtf$max_date_fire, na.rm=T),
                              extent.sp=extent.sp,
                              show.progress=F)
@@ -259,6 +260,111 @@ fire.attach_to_trajs_run <- function(trajs_run, extent, f.sf, delay_hour=24){
     fire_frp=sum(frp, na.rm=T),
     fire_count=dplyr::n()
   )
+}
+
+
+#' Join active fire data to tibble with trajs_rs RASTER STACK and date column. In each row of mt, trajs_rs should be a rasterstack encapsulated in a list
+#'
+#' @param mt
+#' @param duration_hour
+#'
+#' @return
+#' @export
+#'
+fire.attach_to_trajs_rs <- function(mt, delay_hour=24){
+
+  if(!all(c("location_id", "date", "trajs_rs") %in% names(mt))){
+    stop("wt should  contain the following columns: ",paste("location_id", "date", "trajs_rs"))
+  }
+
+  layer_name_to_date <- function(n){strptime(n, "X%Y.%m.%d", tz="UTC")}
+
+  # Split by run
+  mtf <- mt %>%
+    rowwise() %>%
+    mutate(min_date_fire=min(layer_name_to_date(names(trajs_rs))),
+           max_date_fire=max(layer_name_to_date(names(trajs_rs))),
+           extent=list(sf::st_as_sfc(sf::st_bbox(raster::extent(trajs_rs))))
+    )
+
+
+  print("Downloading fires")
+  fire.download(date_from=min(mtf$min_date_fire, na.rm=T),
+                date_to=max(mtf$max_date_fire, na.rm=T))
+  print("Done")
+
+  # Read and only keep fires within extent to save memory
+  # And per year (or month)
+  date_group_fn <- function(x) strftime(x,"%Y%m") # Can be year, month, or even date (lot of redundancy in the latter case)
+  mtf$date_group <- date_group_fn(mtf$max_date_fire)
+
+  print("Attaching fires (month by month)")
+  mtf <- pbapply::pblapply(base::split(mtf, mtf$date_group),
+                           function(mtf){
+
+                             extent.sp <- sf::as_Spatial(do.call(sf::st_union, mtf$extent))
+                             f.sf <- fire.read(date_from=min(mtf$min_date_fire, na.rm=T)-lubridate::days(1),
+                                               date_to=max(mtf$max_date_fire, na.rm=T),
+                                               extent.sp=extent.sp,
+                                               show.progress=F)
+
+                             mtf$fires <- mapply(
+                               fire.attach_to_trajs_single_rs,
+                               trajs_rs=mtf$trajs_rs,
+                               extent=mtf$extent,
+                               f.sf=list(f.sf),
+                               delay_hour=delay_hour,
+                               SIMPLIFY = F
+                             )
+                             return(mtf)
+                           }) %>%
+    do.call(bind_rows,.)
+  print("Done")
+
+  return(mtf)
+}
+
+#' Attach fires to a single raster stack
+#'
+#' @param trajs_run
+#' @param f.sf
+#' @param delay_hour how "old" can a fire be to be accounted for in trajectory
+#'
+#' @return tibble of fires
+#'
+#' @examples
+fire.attach_to_trajs_single_rs <- function(trajs_rs, extent, f.sf, delay_hour=24){
+
+
+  extent.sf <- sf::st_sfc(extent)
+  sf::st_crs(extent.sf) <- sf::st_crs(f.sf)
+
+  dates <- strptime(names(trajs_rs), "X%Y.%m.%d", tz="UTC")
+
+  f.sf.dates <- f.sf %>%
+    filter(acq_date <= max(dates),
+           acq_date >= min(dates) - lubridate::hours(delay_hour)) %>%
+    filter(nrow(.)>0 &  suppressMessages(sf::st_intersects(., extent.sf, sparse = F)))
+
+  f <- lapply(names(trajs_rs), function(layer){
+    date <- strptime(layer, "X%Y.%m.%d", tz="UTC")
+    fires.date <- f.sf %>% filter(acq_date==date)
+    if(nrow(fires.date)==0){return(list(fire_count=0,fire_frp=0))}
+    fires.date$weight <-
+      raster::extract(
+        trajs_rs[[layer]],
+        fires.date
+    )
+    tibble(fire_count=sum(fires.date$weight, na.rm=T),
+         fire_frp=sum(fires.date$weight*fires.date$frp, na.rm=T))
+  })
+
+  do.call(rbind, f) %>%
+    group_by() %>%
+    summarise_at(
+      c("fire_frp","fire_count"),
+      mean,
+      na.rm=T)
 }
 
 
