@@ -211,7 +211,7 @@ utils.attach.frp.raster<- function(mft, buffer_km, duration_hour){
 #' @export
 #'
 #' @examples
-utils.attach.basemaps <- function(m, radius_km=100, zoom_level=6){
+utils.attach.basemaps <- function(m, radius_km=100, zoom_level=6, source="stamen", terrain="terrain"){
 
   utils.ggmap_register()
 
@@ -221,14 +221,14 @@ utils.attach.basemaps <- function(m, radius_km=100, zoom_level=6){
 
   basemaps <- mc %>%
     rowwise() %>%
-    mutate(basemap = list(utils.geometry_to_basemap(geometry, radius_km, zoom_level))) %>%
+    mutate(basemap = list(utils.geometry_to_basemap(geometry, radius_km, zoom_level, source, terrain))) %>%
     filter(!all(is.na(basemap)))
 
   return(m %>% left_join(basemaps))
 
 }
 
-utils.geometry_to_basemap <- function(g, radius_km, zoom_level){
+utils.geometry_to_basemap <- function(g, radius_km, zoom_level, source="stamen", terrain="terrain"){
 
   tryCatch({
     bbox_100km <- g %>%
@@ -238,7 +238,7 @@ utils.geometry_to_basemap <- function(g, radius_km, zoom_level){
       sf::st_transform(crs=4326) %>%
       sf::st_bbox()
     ggmap::get_map(location=unname(bbox_100km),zoom=zoom_level,
-                   source="stamen", terrain="terrain")
+                   source=source, terrain=terrain)
   }, error=function(err){
     print("Failed to build basemap")
     print(g)
