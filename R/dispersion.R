@@ -83,7 +83,7 @@ dispersion.get <- function(dates,
         }
 
         # Convert sp data to raster
-        r.count <- dispersion.tbl_to_tif(d, res_deg=res_deg)
+        r.count <- dispersion.to_raster(d, res_deg=res_deg)
         # Save to cache
         if(!is.null(cache_folder)){
           saveRDS(d, file.cache.sp)
@@ -133,9 +133,9 @@ dispersion.cache_filename <- function(location_id, met_type, height, duration_ho
         sep=".")
 }
 
-dispersion.tbl_to_tif <- function(d, res_deg){
+dispersion.to_raster <- function(d, res_deg){
 
-  d$id <- seq_along(d$particle_i)
+  d$id <- seq(1, nrow(d))
   sp::coordinates(d) <- ~lon+lat
   r <- raster::raster(d,
                       resolution=res_deg)

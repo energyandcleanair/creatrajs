@@ -18,7 +18,9 @@ trajs.get <- function(dates,
                       met_type,
                       heights,
                       duration_hour,
+                      hours=c(0,6,12,18),
                       timezone="UTC",
+                      use_cache=T, # If False, will not read cache BUT will try to write in it
                       cache_folder=NULL,
                       parallel=F, # NOT TOTALLY WORKING YET (weather download at least is an issue)
                       mc.cores=max(parallel::detectCores()-1,1),
@@ -34,6 +36,7 @@ trajs.get <- function(dates,
                             height,
                             duration_hour,
                             timezone,
+                            hours,
                             cache_folder){
     tryCatch({
 
@@ -42,6 +45,7 @@ trajs.get <- function(dates,
         trajs.cache_filename(location_id, met_type, height, duration_hour, date))
 
       if(!is.null(cache_folder) &&
+         use_cache &&
          file.exists(file.cache) &&
          file.info(file.cache)$size > 100){
         # Cache version exists and has data
@@ -53,7 +57,8 @@ trajs.get <- function(dates,
                            met_type=met_type,
                            duration_hour=duration_hour,
                            height=height,
-                           timezone=timezone
+                           timezone=timezone,
+                           hours=hours
         )
 
         if(length(t)==0 || (length(t)==1 && is.na(t))){
@@ -89,6 +94,7 @@ trajs.get <- function(dates,
     duration_hour=duration_hour,
     timezone=timezone,
     cache_folder=cache_folder,
+    hours=list(hours),
     SIMPLIFY=F)
 
   return(trajs)
@@ -105,9 +111,13 @@ trajs.get <- function(dates,
 #' @export
 #'
 #' @examples
-trajs.buffer <- function(trajs, buffer_km){
+trajs.buffer <- function(trajs, buffer_km, merge=T){
   tryCatch({
-    suppressMessages(sf::st_as_sf(trajs, coords=c("lon","lat"), crs=4326) %>%
+    b <- suppressMessages(sf::st_as_sf(trajs[!is.na(trajs$lat),],
+                                       coords=c("lon","lat"), crs=4326) %>%
+                       group_by(run) %>%
+                       mutate(n=n()) %>%
+                       filter(n>1) %>% #LINESTRING WITH ONLY ONE POINT CAN'T BE BUFFERED
                        group_by(run) %>%
                        arrange(traj_dt) %>%
                        summarise(do_union = FALSE) %>%
@@ -116,9 +126,34 @@ trajs.buffer <- function(trajs, buffer_km){
                        sf::st_buffer(buffer_km*1000) %>%
                        # sf::st_bbox() %>%
                        # sf::st_as_sfc() %>%
-                       sf::st_transform(crs=4326) %>%
-                       sf::st_union())
+                       sf::st_transform(crs=4326))
 
+    if(merge){
+      b <- suppressMessages(sf::st_union(b))
+    }
+    return(b)
+  }, error=function(c){
+    return(NA)
+  })
+}
+
+
+trajs.buffer_pts <- function(trajs, buffer_km, res_deg){
+
+  tryCatch({
+    t.sf <- trajs.buffer(trajs, buffer_km, merge=F)
+    runs <- unique(t.sf$run)
+
+    lapply(runs, function(run){
+      t=t.sf[t.sf$run==run,]
+      suppressMessages(t %>%
+        sf::st_make_grid(cellsize = res_deg/2, what = "centers") %>% # We want to be sure we'll be in every cell
+        sf::st_intersection(t) %>%
+        as.data.frame() %>%
+        mutate(run=!!run))
+    }) %>%
+      do.call(bind_rows,.) %>%
+      sf::st_as_sf()
   }, error=function(c){
     return(NA)
   })
@@ -136,7 +171,7 @@ trajs.cache_filename <- function(location_id, met_type, height, duration_hour, d
 }
 
 
-hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timezone="UTC"){
+hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timezone="UTC", hours=c(0, 6, 12, 18)){
 
   dir_hysplit_met <- Sys.getenv("DIR_HYSPLIT_MET", here::here(utils.get_cache_folder("weather")))
   dir_hysplit_output <- file.path(tempdir(), substr(uuid::UUIDgenerate(),1,6)) # Important so that several computations can be ran simultaneously!!
@@ -145,7 +180,6 @@ hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timez
   lon <- sf::st_coordinates(geometry)[1]
 
   # Build date/hour combinations in UTC
-  hours <- c(0, 6, 12, 18)
   offset <- as.double(as.POSIXct(date,tz=timezone)-as.POSIXct(date,tz="UTC"), units="hours")
   hours_utc <- hours + offset
 
@@ -178,6 +212,42 @@ hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timez
     print(c)
     return(NA)
   })
+}
+
+
+#' Convert a trajectories tibble to a raster stack (one layer per day)
+#'
+#' @param t
+#' @param res_deg
+#'
+#' @return
+#' @export
+#'
+#' @examples
+trajs.to_rasterstack <- function(t, buffer_km, res_deg){
+
+
+  # Create raster
+  t.sf <- trajs.buffer(t, buffer_km)
+  t.sp <- as(t.sf, "Spatial")
+  r <- raster::raster(t.sp,resolution=res_deg)
+  raster::crs(r) <- 4326
+  t$id <- seq(1, nrow(t))
+
+  # Rasterize for every single dat
+  ts <- split(t, lubridate::date(t$traj_dt))
+  lapply(ts,
+         function(t){
+           # Cannot buffer: polygons only affect a cell if it contains cell center
+           # We create a grid for every polygon
+           t.sf.pts <- trajs.buffer_pts(t, buffer_km=buffer_km, res_deg=res_deg)
+           raster::rasterize(as(t.sf.pts,"Spatial"),
+                             r,
+                             field='run',
+                             fun=function(x, ...) {length(unique(na.omit(x)))}
+                             )
+
+         }) %>% raster::stack()
 }
 
 
