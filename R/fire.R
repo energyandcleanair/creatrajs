@@ -35,11 +35,13 @@ fire.download <- function(date_from=NULL, date_to=NULL, region="Global"){
 
     modis_key <- Sys.getenv("MODIS_KEY")
     for(f in file.todownload){
-      cmd <- paste0("wget -e robots=off -nc -np -R .html,.tmp -nH --cut-dirs=5 \"https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/suomi-npp-viirs-c2/", region, "/", f,"\" --header \"Authorization: Bearer ",
-                    modis_key,
-                    "\" -P ",
-                    d)
-      system(cmd)
+      tryCatch({
+        cmd <- paste0("wget -e robots=off -nc -np -R .html,.tmp -nH --cut-dirs=5 \"https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/suomi-npp-viirs-c2/", region, "/", f,"\" --header \"Authorization: Bearer ",
+                      modis_key,
+                      "\" -P ",
+                      d)
+        system(cmd)
+      }, error=function(e) print(e))
     }
   }
 }
