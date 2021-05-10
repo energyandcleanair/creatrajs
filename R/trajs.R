@@ -24,6 +24,7 @@ trajs.get <- function(dates,
                       cache_folder=NULL,
                       parallel=F, # NOT TOTALLY WORKING YET (weather download at least is an issue)
                       mc.cores=max(parallel::detectCores()-1,1),
+                      debug=T
                       ...){
 
 
@@ -37,7 +38,8 @@ trajs.get <- function(dates,
                             duration_hour,
                             timezone,
                             hours,
-                            cache_folder){
+                            cache_folder,
+                            debug){
     tryCatch({
 
       file.cache <- file.path(
@@ -69,6 +71,12 @@ trajs.get <- function(dates,
         if(!is.null(cache_folder)){
           saveRDS(t,file.cache)
         }
+
+        if(debug){
+          print("Memory used:")
+          mem_used()
+        }
+
         return(t)
       }}, error=function(c){
         print(c)
@@ -95,6 +103,7 @@ trajs.get <- function(dates,
     timezone=timezone,
     cache_folder=cache_folder,
     hours=list(hours),
+    debug=debug,
     SIMPLIFY=F)
 
   return(trajs)
