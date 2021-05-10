@@ -24,7 +24,8 @@ Imports:
     googleCloudStorageR,
     parallel,
     pbapply,
-    pbmcapply
+    pbmcapply,
+    pryr
 Depends:
     ggplot2,
     ggmap

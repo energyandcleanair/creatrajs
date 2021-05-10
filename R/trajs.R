@@ -24,7 +24,7 @@ trajs.get <- function(dates,
                       cache_folder=NULL,
                       parallel=F, # NOT TOTALLY WORKING YET (weather download at least is an issue)
                       mc.cores=max(parallel::detectCores()-1,1),
-                      debug=T
+                      debug=T,
                       ...){
 
 
