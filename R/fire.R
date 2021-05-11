@@ -245,6 +245,10 @@ fire.attach_to_trajs_run <- function(trajs_run, extent, f.sf, delay_hour=24){
     stop("This function should only be called for one trajectory run")
   }
 
+  if(nrow(f.sf)==0){
+    return(tibble(fire_frp=0, fire_count=0))
+  }
+
   extent.sf <- sf::st_sfc(extent)
   sf::st_crs(extent.sf) <- sf::st_crs(f.sf)
 
