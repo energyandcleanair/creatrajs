@@ -73,8 +73,7 @@ trajs.get <- function(dates,
         }
 
         if(debug){
-          print("Memory used:")
-          pryr::mem_used()
+          message("Memory used: ", round(pryr::mem_used()/1E6),"MB")
         }
 
         return(t)
