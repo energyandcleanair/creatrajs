@@ -139,7 +139,7 @@ dispersion.to_raster <- function(d, res_deg){
   sp::coordinates(d) <- ~lon+lat
   r <- raster::raster(d,
                       resolution=res_deg)
-  raster::crs(r) <- 4326
+  raster::crs(r) <- sp::CRS("+init=epsg:4326")
 
   raster::rasterize(d,
                     r,
