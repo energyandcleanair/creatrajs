@@ -20,7 +20,7 @@ test_that("backward dispersion work", {
 
   # Without cache
   date_from = "2020-01-04"
-  date_to = "2020-01-07"
+  date_to = "2020-01-05"
   duration_hour = 24
   dates = seq.Date(as.Date(date_from), as.Date(date_to), by="day")
   timezone = unique(m$timezone)
@@ -35,7 +35,8 @@ test_that("backward dispersion work", {
                             duration_hour = duration_hour,
                             timezone = timezone,
                             res_deg=0.01,
-                            cache_folder = NULL
+                            cache_folder = NULL,
+                            parallel = T
   )
   toc()
 
@@ -71,7 +72,7 @@ test_that("backward dispersion work", {
   toc()
 
 
-  i=4
+  i=2
 
 
   ti.sf <- t24[[i]] %>% sf::st_as_sf(coords=c("lon","lat"))
@@ -79,6 +80,84 @@ test_that("backward dispersion work", {
   raster::plot(as(ti.sf, "Spatial"), add=T)
 
 })
+
+test_that("attach_to_disp work", {
+
+  require(rcrea)
+  require(testthat)
+  require(tictoc)
+
+  date_from = "2020-01-04"
+  date_to = "2020-01-04"
+  duration_hour = 24
+  dates = seq.Date(as.Date(date_from), as.Date(date_to), by="day")
+  timezone = unique(m$timezone)
+
+  m <- rcrea::measurements(city="Lahore",
+                           poll="pm25",
+                           source="openaq_government",
+                           date_from = date_from,
+                           date_to = date_to,
+                           process_id="city_day_mad",
+                           with_geometry=T
+  )
+
+  tic()
+  d <- creatrajs::dispersion.get(dates=dates,
+                                 geometry = m$geometry,
+                                 location_id = m$location_id,
+                                 country = m$country,
+                                 met_type = "gdas1",
+                                 heights = 500,
+                                 duration_hour = duration_hour,
+                                 timezone = timezone,
+                                 res_deg=0.01,
+                                 cache_folder = NULL,
+                                 parallel = T
+  )
+  toc()
+
+  expect_false(any(is.na(d)))
+  expect_equal(class(d), "list")
+  expect_equal(class(d[[1]])[1], "RasterLayer")
+
+
+  # Compare with trajectories (the whole backward thing can be tricky
+  tic()
+  t <- creatrajs::trajs.get(dates=dates,
+                            geometry = m$geometry,
+                            location_id = m$location_id,
+                            country = m$country,
+                            met_type = "gdas1",
+                            heights = 500,
+                            duration_hour = duration_hour,
+                            timezone = timezone,
+                            cache_folder = NULL)
+  toc()
+
+  tic()
+  t24 <- creatrajs::trajs.get(dates=dates,
+                              geometry = m$geometry,
+                              location_id = m$location_id,
+                              country = m$country,
+                              met_type = "gdas1",
+                              heights = 500,
+                              duration_hour = duration_hour,
+                              timezone = timezone,
+                              hours=seq(1,23),
+                              cache_folder = NULL)
+  toc()
+
+
+  i=2
+
+
+  ti.sf <- t24[[i]] %>% sf::st_as_sf(coords=c("lon","lat"))
+  raster::plot(d[[i]], ext=sf::st_bbox(ti.sf))
+  raster::plot(as(ti.sf, "Spatial"), add=T)
+
+})
+
 
 test_that("parallel works", {
 

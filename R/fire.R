@@ -471,17 +471,10 @@ fire.attach_to_disps <- function(mt, buffer_km=10, delay_hour=24){
 
 
 
+
   # Split by run
   print("Splitting by run")
   mtf <- mt %>%
-    rowwise() %>%
-    mutate(trajs.run=list(trajs %>%
-                            mutate(run2=run) %>%
-                            group_by(run2) %>%
-                            tidyr::nest(trajs=-run2) %>%
-                            rename(run=run2))) %>%
-    select(-c(trajs)) %>%
-    tidyr::unnest(trajs.run) %>%
     rowwise() %>%
     mutate(extent=trajs.buffer(trajs=trajs, buffer_km=buffer_km),
            min_date_fire=min(trajs$traj_dt, na.rm=T)-lubridate::hours(delay_hour),

@@ -102,6 +102,7 @@ test_that("attaching fire - trajectories. Both vector and raster", {
   toc()
 
 
+
   # Visual confirmation
   i=2
   ti.sf <- mtf$trajs[[i]] %>% sf::st_as_sf(coords=c("lon","lat"))
@@ -112,6 +113,17 @@ test_that("attaching fire - trajectories. Both vector and raster", {
   raster::plot(subset(rs$trajs_rs[[i]],3), ext=sf::st_bbox(ti.sf), add=T)
   raster::plot(subset(rs$trajs_rs[[i]],4), ext=sf::st_bbox(ti.sf), add=T)
   raster::plot(as(ti.sf, "Spatial"), add=T)
+
+
+  bind_rows(
+    mtf %>% tidyr::unnest(fires) %>% mutate(version="vector"),
+    rsf %>% tidyr::unnest(fires) %>% mutate(version="raster")
+  ) %>%
+    ggplot() +
+    geom_bar(aes(date, fire_count, fill=version),
+             stat="identity",
+             position="dodge")
+
 
 })
 

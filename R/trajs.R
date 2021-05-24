@@ -121,24 +121,39 @@ trajs.get <- function(dates,
 #' @examples
 trajs.buffer <- function(trajs, buffer_km, merge=T){
   tryCatch({
-    b <- suppressMessages(sf::st_as_sf(trajs[!is.na(trajs$lat),],
-                                       coords=c("lon","lat"), crs=4326) %>%
-                       group_by(run) %>%
-                       mutate(n=n()) %>%
-                       filter(n>1) %>% #LINESTRING WITH ONLY ONE POINT CAN'T BE BUFFERED
-                       group_by(run) %>%
-                       arrange(traj_dt) %>%
-                       summarise(do_union = FALSE) %>%
-                       sf::st_cast("LINESTRING") %>%
-                       sf::st_transform(crs=3857) %>%
-                       sf::st_buffer(buffer_km*1000) %>%
-                       # sf::st_bbox() %>%
-                       # sf::st_as_sfc() %>%
-                       sf::st_transform(crs=4326))
+
+    t <- sf::st_as_sf(trajs[!is.na(trajs$lat),],
+                 coords=c("lon","lat"), crs=4326) %>%
+      group_by(run) %>%
+      mutate(n=n())
+
+    do_buffer <- function(t){
+      suppressMessages(t %>%
+                         sf::st_transform(crs=3857) %>%
+                         sf::st_buffer(buffer_km*1000) %>%
+                         # sf::st_bbox() %>%
+                         # sf::st_as_sfc() %>%
+                         sf::st_transform(crs=4326))
+    }
+
+    t.lines <- t %>%
+      filter(n>1) %>% #LINESTRING WITH ONLY ONE POINT CAN'T BE BUFFERED
+      group_by(run) %>%
+      arrange(traj_dt) %>%
+      summarise(do_union = FALSE) %>%
+      sf::st_cast("LINESTRING")
+
+    t.points <- t %>%
+      filter(n==1)
+
+    b <- rbind(
+      do_buffer(t.lines),
+      do_buffer(t.points))
 
     if(merge){
       b <- suppressMessages(sf::st_union(b))
     }
+
     return(b)
   }, error=function(c){
     return(NA)
