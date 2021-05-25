@@ -147,14 +147,12 @@ gfas.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
 
   # Split by run
   print("Splitting by run")
-  tic()
   mtf <- trajs.split_by_run_and_buffer(mt, buffer_km) %>%
     rowwise() %>%
     mutate(min_date_fire=min(trajs$traj_dt, na.rm=T)-lubridate::hours(delay_hour),
            max_date_fire=max(trajs$traj_dt, na.rm=T)
     ) %>%
     filter(!is.na(min_date_fire))
-  toc()
   print("Done")
 
   # print("Downloading fires")
