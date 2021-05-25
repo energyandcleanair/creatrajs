@@ -49,7 +49,7 @@ trajs.get <- function(dates,
       if(!is.null(cache_folder) &&
          use_cache &&
          file.exists(file.cache) &&
-         file.info(file.cache)$size > 100){
+         file.info(file.cache)$size > 600){
         # Cache version exists and has data
         return(readRDS(file.cache))
       }else{
