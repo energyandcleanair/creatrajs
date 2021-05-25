@@ -4,7 +4,7 @@ test_that("getting gfas works", {
   require(testthat)
 
   date_from <- "2021-01-01"
-  date_to <- "2018-01-05"
+  date_to <- "2021-01-05"
   creatrajs::gfas.download(date_from=date_from, date_to=date_to)
 
   rs <- creatrajs::gfas.read(
@@ -43,7 +43,7 @@ test_that("attaching gfas - trajectories", {
   require(tidyverse)
 
   date_from <- "2018-01-01"
-  date_to <- "2018-01-03"
+  date_to <- "2018-01-10"
   buffer_km <- 50
 
   m <- rcrea::measurements(city="Bangkok",

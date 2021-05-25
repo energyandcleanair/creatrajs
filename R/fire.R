@@ -160,27 +160,19 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
 
   # Split by run
   print("Splitting by run")
-  mtf <- mt %>%
+  mtf <- trajs.split_by_run_and_buffer(mt, buffer_km) %>%
     rowwise() %>%
-    mutate(trajs.run=list(trajs %>%
-                            mutate(run2=run) %>%
-                            group_by(run2) %>%
-                            tidyr::nest(trajs=-run2) %>%
-                            rename(run=run2))) %>%
-    select(-c(trajs)) %>%
-    tidyr::unnest(trajs.run) %>%
-    rowwise() %>%
-    filter(nrow(trajs)>1) %>%
-    mutate(extent=trajs.buffer(trajs=trajs, buffer_km=buffer_km),
-           min_date_fire=min(trajs$traj_dt, na.rm=T)-lubridate::hours(delay_hour),
+    mutate(min_date_fire=min(trajs$traj_dt, na.rm=T)-lubridate::hours(delay_hour),
            max_date_fire=max(trajs$traj_dt, na.rm=T)
-           )
+    ) %>%
+    filter(!is.na(min_date_fire))
   print("Done")
 
   print("Downloading fires")
   fire.download(date_from=min(mtf$min_date_fire, na.rm=T),
                 date_to=max(mtf$max_date_fire, na.rm=T))
   print("Done")
+
   # Read and only keep fires within extent to save memory
   # And per year (or month)
   date_group_fn <- function(x) strftime(x,"%Y%m") # Can be year, month, or even date (lot of redundancy in the latter case)

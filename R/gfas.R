@@ -147,27 +147,20 @@ gfas.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
 
   # Split by run
   print("Splitting by run")
-  mtf <- mt %>%
+  tic()
+  mtf <- trajs.split_by_run_and_buffer(mt, buffer_km) %>%
     rowwise() %>%
-    mutate(trajs.run=list(trajs %>%
-                            mutate(run2=run) %>%
-                            group_by(run2) %>%
-                            tidyr::nest(trajs=-run2) %>%
-                            rename(run=run2))) %>%
-    select(-c(trajs)) %>%
-    tidyr::unnest(trajs.run) %>%
-    rowwise() %>%
-    filter(nrow(trajs)>1) %>%
-    mutate(extent=trajs.buffer(trajs=trajs, buffer_km=buffer_km),
-           min_date_fire=min(trajs$traj_dt, na.rm=T)-lubridate::hours(delay_hour),
+    mutate(min_date_fire=min(trajs$traj_dt, na.rm=T)-lubridate::hours(delay_hour),
            max_date_fire=max(trajs$traj_dt, na.rm=T)
-    )
+    ) %>%
+    filter(!is.na(min_date_fire))
+  toc()
   print("Done")
 
-  print("Downloading fires")
-  gfas.download(date_from=min(mtf$min_date_fire, na.rm=T),
-                date_to=max(mtf$max_date_fire, na.rm=T))
-  print("Done")
+  # print("Downloading fires")
+  # gfas.download(date_from=min(mtf$min_date_fire, na.rm=T),
+  #               date_to=max(mtf$max_date_fire, na.rm=T))
+  # print("Done")
 
   # Read and only keep fires within extent to save memory
   # And per year (or month)
@@ -236,24 +229,21 @@ gfas.attach_to_trajs_run <- function(trajs_run, extent, gfas_rs, buffer_km, dela
 
   extent.sf <- sf::st_sfc(extent)
   sf::st_crs(extent.sf) <- sf::st_crs(gfas_rs)
+  extent.sp <- as(extent.sf, "Spatial")
 
   rs_dates <- as.POSIXct(gfas_rs@z$time)
-  rs_layers_idx <- (rs_dates <= max(trajs_run$traj_dt, na.rm=T)) &
-    (rs_dates >= min(trajs_run$traj_dt, na.rm=T) - lubridate::hours(delay_hour))
 
   trajs_run_date <- split(trajs_run, lubridate::date(trajs_run$traj_dt))
-
 
   emissions <- lapply(trajs_run_date,
                       function(trajs_day){
                         date <- unique(lubridate::date(trajs_day$traj_dt))
-                        rs_idx <- which(rs_dates==date)
+                        rs_idx <- which(lubridate::date(rs_dates)==date)
                         if(length(rs_idx)==0){
                           return(NA)
                         }
                         rs_date <- raster::subset(gfas_rs, rs_idx)
-                        extent <- trajs.buffer(trajs=trajs_day, buffer_km=buffer_km) %>% sf::st_as_sf()
-                        raster::extract(rs_date, extent, sum)[[1]]
+                        raster::extract(rs_date, extent.sp, sum)[[1]]
                       })
 
 

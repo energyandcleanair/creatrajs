@@ -119,13 +119,20 @@ trajs.get <- function(dates,
 #' @export
 #'
 #' @examples
-trajs.buffer <- function(trajs, buffer_km, merge=T){
+trajs.buffer <- function(trajs, buffer_km, merge=T, group_cols=c("location_id","date","run")){
   tryCatch({
+
+
+    if(!all(group_cols %in% names(trajs))){
+      group_cols <- intersect(names(trajs), group_cols)
+      message("Reducing trajs grouping columns to ", group_cols)
+    }
+
 
     t <- sf::st_as_sf(trajs[!is.na(trajs$lat),],
                  coords=c("lon","lat"), crs=4326) %>%
-      group_by(run) %>%
-      mutate(n=dplyr::n())
+      group_by_at(group_cols) %>%
+      mutate(count=dplyr::n())
 
     do_buffer <- function(t){
       suppressMessages(t %>%
@@ -137,14 +144,14 @@ trajs.buffer <- function(trajs, buffer_km, merge=T){
     }
 
     t.lines <- t %>%
-      filter(n>1) %>% #LINESTRING WITH ONLY ONE POINT CAN'T BE BUFFERED
-      group_by(run) %>%
+      filter(count>1) %>% #LINESTRING WITH ONLY ONE POINT CAN'T BE BUFFERED
+      group_by_at(group_cols) %>%
       arrange(traj_dt) %>%
       summarise(do_union = FALSE) %>%
       sf::st_cast("LINESTRING")
 
     t.points <- t %>%
-      filter(n==1)
+      filter(count==1)
 
     b <- rbind(
       do_buffer(t.lines),
@@ -160,6 +167,44 @@ trajs.buffer <- function(trajs, buffer_km, merge=T){
     return(NA)
   })
 }
+
+
+
+#' Add a buffer extent to each single trajectory run
+#'
+#' @param trajs
+#' @param buffer_km
+#'
+#' @return
+#' @export
+#'
+#' @examples
+trajs.split_by_run_and_buffer <- function(mt, buffer_km){
+
+  nest_cols <- names(mt) %>%
+    setdiff("trajs") %>%
+    gsub("date","date_recept",.)
+
+  trajs <- mt %>%
+    rename(date_recept=date) %>%
+    tidyr::unnest(trajs)
+
+  extents <- trajs.buffer(trajs, buffer_km, merge=F, group_cols=c("location_id","date_recept","run")) %>%
+    as.data.frame() %>%
+    rename(extent=geometry)
+
+  trajs.run <- trajs %>%
+    mutate(run2=run) %>%
+    group_by_at(c(nest_cols,"run2")) %>%
+    tidyr::nest() %>%
+    rename(trajs=data,
+           run=run2)
+
+  left_join(trajs.run, extents,
+            by=c("location_id","date_recept","run")) %>%
+    rename(date=date_recept)
+}
+
 
 
 trajs.buffer_pts <- function(trajs, buffer_km, res_deg){
