@@ -221,7 +221,7 @@ gfas.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
 #' @param delay_hour how "old" can a fire be to be accounted for in trajectory
 #'
 #' @return tibble of fires
-#'
+#' @export
 #' @examples
 gfas.attach_to_trajs_run <- function(trajs_run, extent, gfas_rs, delay_hour=24){
 
