@@ -64,7 +64,7 @@ gfas.download <- function(date_from=NULL, date_to=NULL, region="Global"){
       request,
       Sys.getenv("ECMWF_API_EMAIL"),
       transfer = TRUE,
-      path = d(),
+      path = d,
       time_out = 3600*5,
       # job_name = "gfas_download",
       verbose = TRUE
