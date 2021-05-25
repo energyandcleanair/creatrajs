@@ -3,7 +3,7 @@ test_that("getting gfas works", {
   require(rcrea)
   require(testthat)
 
-  date_from <- "2018-01-01"
+  date_from <- "2021-01-01"
   date_to <- "2018-01-05"
   creatrajs::gfas.download(date_from=date_from, date_to=date_to)
 

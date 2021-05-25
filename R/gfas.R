@@ -1,3 +1,12 @@
+gfas.filename_to_date <- function(f){
+    as.Date(gsub(".*([0-9]{8})\\.nc","\\1", f), format="%Y%m%d", tz="UTC")
+}
+
+gfas.available_filenames <- function(){
+  d <- utils.get_gfas_folder()
+  list.files(d, "*.nc", full.names = T) #TODO Further filtering
+}
+
 
 #' Download GFAS data into local folder
 #'
@@ -10,38 +19,73 @@
 #'
 #' @examples
 gfas.download <- function(date_from=NULL, date_to=NULL, region="Global"){
+
   d <- utils.get_gfas_folder()
   dir.create(d, showWarnings = F, recursive = T)
 
-  date_from <- max(lubridate::date(date_from), lubridate::date("2020-01-01"))
-  # # Data not available in repository before that
-  # # Have been downloaded manually prior 2020
-  # # https://firms.modaps.eosdis.nasa.gov/download/
-  # if(date_to >= date_from){
-  #   files.all <- paste0("SUOMI_VIIRS_C2_",
-  #                       region,
-  #                       "_VNP14IMGTDL_NRT_",
-  #                       as.POSIXct(seq(lubridate::date(date_from),
-  #                                      lubridate::date(date_to),
-  #                                      by="day")) %>% strftime("%Y%j"),
-  #                       ".txt")
-  #
-  #   # Even though wget can manage already downloaded files,
-  #   # this is faster and less verbose in console
-  #   files.existing <- list.files(d, "*.txt")
-  #   file.todownload <- setdiff(files.all, files.existing)
-  #
-  #   modis_key <- Sys.getenv("MODIS_KEY")
-  #   for(f in file.todownload){
-  #     tryCatch({
-  #       cmd <- paste0("wget -e robots=off -nc -np -R .html,.tmp -nH --cut-dirs=5 \"https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/suomi-npp-viirs-c2/", region, "/", f,"\" --header \"Authorization: Bearer ",
-  #                     modis_key,
-  #                     "\" -P ",
-  #                     d)
-  #       system(cmd)
-  #     }, error=function(e) print(e))
-  #   }
-  # }
+
+  required_dates <- seq(as.Date(date_from, tz="UTC"), as.Date(date_to, tz="UTC"), by="days")
+  available_dates <- gfas.filename_to_date(gfas.available_filenames())
+  download_dates <- as.Date(setdiff(required_dates, available_dates), origin="1970-01-01")
+
+
+  # One request per contigous set
+  sets.tbl <- tibble(date=download_dates) %>%
+    arrange() %>%
+    # rowwise() %>%
+    mutate(jump=as.numeric(date-dplyr::lag(date),units="days")>1) %>%
+    mutate(set=cumsum(tidyr::replace_na(jump,T)))
+
+  sets <- split(sets.tbl$date, sets.tbl$set)
+
+  ecmwfr::wf_set_key(user = Sys.getenv("ECMWF_API_EMAIL"), key = Sys.getenv("ECMWF_API_KEY"), service = "webapi")
+  ecmwfr::wf_datasets(Sys.getenv("ECMWF_API_EMAIL"))
+
+  lapply(sets, function(set){
+    date_from <- min(set)
+    date_to <- max(set)
+    filename <- sprintf("%s_to_%s.nc",
+                        strftime(as.POSIXct(date_from),"%Y%m%d"),
+                        strftime(as.POSIXct(date_to),"%Y%m%d"))
+    request <- list(class = "mc",
+                    dataset = "cams_gfas",
+                    date = sprintf("%s/to/%s", date_from, date_to),
+                    expver = "0001",
+                    levtype = "sfc",
+                    param = "87.210",
+                    step = "0-24",
+                    stream = "gfas",
+                    time = "00:00:00",
+                    type = "ga",
+                    target = filename,
+                    format = "netcdf")
+
+    wf_request(
+      request,
+      Sys.getenv("ECMWF_API_EMAIL"),
+      transfer = TRUE,
+      path = d(),
+      time_out = 3600*5,
+      # job_name = "gfas_download",
+      verbose = TRUE
+    )
+
+    # Unpack file
+    r <- raster::raster(filename)
+    n <- raster::nbands(r)
+
+    for(i in seq(n)){
+      r.band <- raster::raster(filename, band=i)
+      date <- lubridate::date(raster::getZ(r.band))
+      f.band <- file.path(d, sprintf("gfas_%s.nc",strftime(date,"%Y%m%d")))
+      if(!file.exists(f.band)){
+        raster::writeRaster(r.band, f.band)
+      }
+    }
+
+    file.remove(filename)
+  })
+
 }
 
 
@@ -60,11 +104,8 @@ gfas.read <- function(date_from=NULL, date_to=NULL, extent.sp=NULL, show.progres
 
   d <- utils.get_gfas_folder()
 
-  fs <- list.files(d, "*.nc", full.names = T) #TODO Further filtering
-
-  f_date <- function(f){
-    as.POSIXct(gsub(".*([0-9]{8})\\.nc","\\1", f), format="%Y%m%d", tz="UTC")
-  }
+  fs <- gfas.available_filenames()
+  f_date <- gfas.filename_to_date
 
   fs <- fs[is.null(date_from) | (f_date(fs) >= as.POSIXct(date_from))]
   fs <- fs[is.null(date_to) | (f_date(fs) <= as.POSIXct(date_to))]
