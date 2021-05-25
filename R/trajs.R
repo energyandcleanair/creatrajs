@@ -125,7 +125,7 @@ trajs.buffer <- function(trajs, buffer_km, merge=T){
     t <- sf::st_as_sf(trajs[!is.na(trajs$lat),],
                  coords=c("lon","lat"), crs=4326) %>%
       group_by(run) %>%
-      mutate(n=n())
+      mutate(n=dplyr::n())
 
     do_buffer <- function(t){
       suppressMessages(t %>%
