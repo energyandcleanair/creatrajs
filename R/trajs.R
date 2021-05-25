@@ -179,6 +179,7 @@ trajs.buffer_pts <- function(trajs, buffer_km, res_deg){
       do.call(bind_rows,.) %>%
       sf::st_as_sf()
   }, error=function(c){
+    warning("Failed to buffer trajs pts: ",c)
     return(NA)
   })
 }
