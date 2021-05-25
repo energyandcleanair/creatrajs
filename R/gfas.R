@@ -4,7 +4,7 @@ gfas.filename_to_date <- function(f){
 
 gfas.available_filenames <- function(){
   d <- utils.get_gfas_folder()
-  list.files(d, "*.nc", full.names = T) #TODO Further filtering
+  list.files(d, "gfas_([0-9]{8})*.nc", full.names = T)
 }
 
 
