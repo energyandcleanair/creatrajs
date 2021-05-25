@@ -60,7 +60,7 @@ gfas.download <- function(date_from=NULL, date_to=NULL, region="Global"){
                     target = filename,
                     format = "netcdf")
 
-    wf_request(
+    ecmwfr::wf_request(
       request,
       Sys.getenv("ECMWF_API_EMAIL"),
       transfer = TRUE,
@@ -71,7 +71,7 @@ gfas.download <- function(date_from=NULL, date_to=NULL, region="Global"){
     )
 
     # Unpack file
-    r <- raster::raster(filename)
+    r <- raster::raster(file.path(d, filename))
     n <- raster::nbands(r)
 
     for(i in seq(n)){
