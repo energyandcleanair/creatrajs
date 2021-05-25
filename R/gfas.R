@@ -45,6 +45,8 @@ gfas.download <- function(date_from=NULL, date_to=NULL, region="Global"){
   lapply(sets, function(set){
     date_from <- min(set)
     date_to <- max(set)
+
+    message("Downloading from ",date_from," to ",date_to)
     filename <- sprintf("%s_to_%s.nc",
                         strftime(as.POSIXct(date_from),"%Y%m%d"),
                         strftime(as.POSIXct(date_to),"%Y%m%d"))
