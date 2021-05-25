@@ -78,7 +78,7 @@ gfas.download <- function(date_from=NULL, date_to=NULL, region="Global"){
     n <- raster::nbands(r)
 
     for(i in seq(n)){
-      r.band <- raster::raster(filename, band=i)
+      r.band <- raster::raster(file.path(d, filename), band=i)
       date <- lubridate::date(raster::getZ(r.band))
       f.band <- file.path(d, sprintf("gfas_%s.nc",strftime(date,"%Y%m%d")))
       if(!file.exists(f.band)){
