@@ -156,6 +156,7 @@ trajs.buffer <- function(trajs, buffer_km, merge=T){
 
     return(b)
   }, error=function(c){
+    warning("Failed to buffer trajs: ",c)
     return(NA)
   })
 }
