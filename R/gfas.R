@@ -22,7 +22,7 @@ gfas.download <- function(date_from=NULL, date_to=NULL, region="Global"){
 
   d <- utils.get_gfas_folder()
   dir.create(d, showWarnings = F, recursive = T)
-
+  options(keyring_backend="file")
 
   required_dates <- seq(as.Date(date_from, tz="UTC"), as.Date(date_to, tz="UTC"), by="days")
   available_dates <- gfas.filename_to_date(gfas.available_filenames())
