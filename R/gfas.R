@@ -188,6 +188,7 @@ gfas.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
                                trajs_run=mtf$trajs,
                                extent=mtf$extent,
                                gfas_rs=list(gfas_rs),
+                               buffer_km=buffer_km,
                                delay_hour=delay_hour,
                                SIMPLIFY = F
                              )
@@ -223,7 +224,7 @@ gfas.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
 #' @return tibble of fires
 #' @export
 #' @examples
-gfas.attach_to_trajs_run <- function(trajs_run, extent, gfas_rs, delay_hour=24){
+gfas.attach_to_trajs_run <- function(trajs_run, extent, gfas_rs, buffer_km, delay_hour=24){
 
   if(length(unique(trajs_run$run))>1){
     stop("This function should only be called for one trajectory run")
