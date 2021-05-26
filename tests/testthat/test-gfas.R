@@ -43,7 +43,7 @@ test_that("attaching gfas - trajectories", {
   require(tidyverse)
 
   date_from <- "2018-01-01"
-  date_to <- "2018-01-10"
+  date_to <- "2018-01-20"
   buffer_km <- 50
 
   m <- rcrea::measurements(city="Bangkok",

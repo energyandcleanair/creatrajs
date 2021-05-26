@@ -217,27 +217,38 @@ trajs.split_by_run_and_buffer <- function(mt, buffer_km){
 #' @export
 #'
 #' @examples
-trajs.split_by_firedate_and_buffer <- function(mt, buffer_km){
+trajs.split_by_firedate_and_buffer <- function(mt, buffer_km, return_full=F){
 
   nest_cols <- names(mt) %>%
     setdiff("trajs")
 
+  print("--unnesting")
   trajs <- mt %>%
     tidyr::unnest(trajs) %>%
     mutate(date_particle=lubridate::date(date_particle))
 
+  print("--buffering")
   extents <- trajs.buffer(trajs, buffer_km, merge=F, group_cols=c("location_id", "date", "date_particle", "run")) %>%
     as.data.frame() %>%
     rename(extent=geometry)
 
-  trajs.run <- trajs %>%
-    mutate(run2=run) %>%
-    group_by_at(c(nest_cols,"run2")) %>%
-    tidyr::nest() %>%
-    rename(trajs=data,
-           run=run2)
-
-  left_join(trajs.run, extents)
+  if(return_full){
+    # With trajectories but much slower
+    print("--nesting")
+    trajs %>%
+      mutate(run2=run) %>%
+      group_by_at(c(nest_cols,"run2")) %>%
+      tidyr::nest() %>%
+      rename(trajs=data,
+             run=run2) %>%
+      left_join(trajs.run, extents)
+  }else{
+    # We keep extent only, much faster
+    print("--distinguishing...")
+    trajs %>%
+      dplyr::distinct_at(c(nest_cols,"run")) %>%
+      left_join(extents)
+  }
 }
 
 trajs.buffer_pts <- function(trajs, buffer_km, res_deg){
