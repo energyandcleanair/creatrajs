@@ -51,7 +51,13 @@ trajs.get <- function(dates,
          file.exists(file.cache) &&
          file.info(file.cache)$size > 600){
         # Cache version exists and has data
-        return(readRDS(file.cache))
+        t <- readRDS(file.cache)
+
+        #backward compatibility:
+        if("date" %in% names(t)){
+          t <- t %>% rename(date_recept=date)
+        }
+        return(t)
       }else{
         # Compute trajs
         t <- hysplit.trajs(date=date,
@@ -151,7 +157,8 @@ trajs.buffer <- function(trajs, buffer_km, merge=T, group_cols=c("location_id","
       sf::st_cast("LINESTRING")
 
     t.points <- t %>%
-      filter(count==1)
+      filter(count==1) %>%
+      select_at(c(group_cols,"geometry"))
 
     b <- rbind(
       do_buffer(t.lines),
@@ -182,14 +189,12 @@ trajs.buffer <- function(trajs, buffer_km, merge=T, group_cols=c("location_id","
 trajs.split_by_run_and_buffer <- function(mt, buffer_km){
 
   nest_cols <- names(mt) %>%
-    setdiff("trajs") %>%
-    gsub("date","date_recept",.)
+    setdiff("trajs")
 
   trajs <- mt %>%
-    rename(date_recept=date) %>%
     tidyr::unnest(trajs)
 
-  extents <- trajs.buffer(trajs, buffer_km, merge=F, group_cols=c("location_id","date_recept","run")) %>%
+  extents <- trajs.buffer(trajs, buffer_km, merge=F) %>%
     as.data.frame() %>%
     rename(extent=geometry)
 
@@ -200,12 +205,40 @@ trajs.split_by_run_and_buffer <- function(mt, buffer_km){
     rename(trajs=data,
            run=run2)
 
-  left_join(trajs.run, extents,
-            by=c("location_id","date_recept","run")) %>%
-    rename(date=date_recept)
+  left_join(trajs.run, extents)
 }
 
+#' Add a buffer extent to each single trajectory run
+#'
+#' @param trajs
+#' @param buffer_km
+#'
+#' @return
+#' @export
+#'
+#' @examples
+trajs.split_by_firedate_and_buffer <- function(mt, buffer_km){
 
+  nest_cols <- names(mt) %>%
+    setdiff("trajs")
+
+  trajs <- mt %>%
+    tidyr::unnest(trajs) %>%
+    mutate(date_particle=lubridate::date(date_particle))
+
+  extents <- trajs.buffer(trajs, buffer_km, merge=F, group_cols=c("location_id", "date", "date_particle", "run")) %>%
+    as.data.frame() %>%
+    rename(extent=geometry)
+
+  trajs.run <- trajs %>%
+    mutate(run2=run) %>%
+    group_by_at(c(nest_cols,"run2")) %>%
+    tidyr::nest() %>%
+    rename(trajs=data,
+           run=run2)
+
+  left_join(trajs.run, extents)
+}
 
 trajs.buffer_pts <- function(trajs, buffer_km, res_deg){
 
@@ -270,7 +303,7 @@ hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timez
 
     # Update fields to be compatible with OpenAIR
     trajs$hour.inc <- trajs$hour_along
-    trajs$date <- trajs$traj_dt_i
+    trajs$date_recept <- trajs$traj_dt_i
     trajs$date_particle <- trajs$traj_dt
     trajs$year <- lubridate::year(trajs$traj_dt_i)
     trajs$month <- lubridate::month(trajs$traj_dt_i)

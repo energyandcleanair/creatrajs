@@ -110,8 +110,8 @@ gfas.read <- function(date_from=NULL, date_to=NULL, extent.sp=NULL, show.progres
   fs <- gfas.available_filenames()
   f_date <- gfas.filename_to_date
 
-  fs <- fs[is.null(date_from) | (f_date(fs) >= as.POSIXct(date_from))]
-  fs <- fs[is.null(date_to) | (f_date(fs) <= as.POSIXct(date_to))]
+  fs <- fs[is.null(date_from) | (f_date(fs) >= as.Date(date_from))]
+  fs <- fs[is.null(date_to) | (f_date(fs) <= as.Date(date_to))]
 
   if(length(fs)==0){
     warning("No file found for the corresponding dates")
@@ -147,12 +147,9 @@ gfas.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
 
   # Split by run
   print("Splitting by run")
-  mtf <- trajs.split_by_run_and_buffer(mt, buffer_km) %>%
-    rowwise() %>%
-    mutate(min_date_fire=min(trajs$traj_dt, na.rm=T)-lubridate::hours(delay_hour),
-           max_date_fire=max(trajs$traj_dt, na.rm=T)
-    ) %>%
-    filter(!is.na(min_date_fire))
+  mtf <- trajs.split_by_firedate_and_buffer(mt, buffer_km) %>%
+    mutate(date_fire=date_particle) %>%
+    filter(!is.na(date_fire))
   print("Done")
 
   # print("Downloading fires")
@@ -162,39 +159,33 @@ gfas.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
 
   # Read and only keep fires within extent to save memory
   # And per year (or month)
-  date_group_fn <- function(x) strftime(x,"%Y%m") # Can be year, month, or even date (lot of redundancy in the latter case)
-  mtf$date_group <- date_group_fn(mtf$max_date_fire)
+  # date_group_fn <- function(x) strftime(x,"%Y%m") # Can be year, month, or even date (lot of redundancy in the latter case)
+  # mtf$date_group <- date_group_fn(mtf$date_fire)
 
-  print("Attaching GFAS (month by month)")
-  mtf <- pbapply::pblapply(base::split(mtf, mtf$date_group),
-                           function(mtf){
-                             extent.sp <- sf::as_Spatial(mtf$extent[!sf::st_is_empty(mtf$extent)])
-                             gfas_rs <- gfas.read(date_from=min(mtf$min_date_fire, na.rm=T)-lubridate::days(1),
-                                               date_to=max(mtf$max_date_fire, na.rm=T),
-                                               extent.sp=extent.sp,
-                                               show.progress=F)
-
-                             mtf$fires <- mapply(
-                               gfas.attach_to_trajs_run,
-                               trajs_run=mtf$trajs,
-                               extent=mtf$extent,
-                               gfas_rs=list(gfas_rs),
-                               buffer_km=buffer_km,
-                               delay_hour=delay_hour,
-                               SIMPLIFY = F
-                             )
-                             return(mtf)
-                           }) %>%
+  print("Attaching GFAS (fire_date by fire_date)")
+  mtf <- pbapply::pblapply(base::split(mtf, mtf$date_fire),
+                            function(x){
+                              extent.sp <- sf::as_Spatial(x$extent[!sf::st_is_empty(x$extent)])
+                              gfas_rs <- gfas.read(date_from=min(x$date_fire, na.rm=T),
+                                                   date_to=max(x$date_fire, na.rm=T),
+                                                   extent.sp=extent.sp,
+                                                   show.progress=F)
+                              if(is.null(gfas_rs)){
+                                x$pm25_emission <- 0
+                              }else{
+                                x$pm25_emission <- raster::extract(gfas_rs, as(x$extent,"Spatial"), sum)
+                              }
+                              return(x)
+                            }) %>%
     do.call(bind_rows,.)
 
   print("Regroup by day (join runs")
   result <- mt %>%
     left_join(
       mtf %>%
-        tidyr::unnest(fires) %>%
         group_by(location_id, date) %>%
         summarise_at(c("pm25_emission"),
-                     mean,
+                     sum,
                      na.rm=T) %>%
         group_by(location_id, date) %>%
         tidyr::nest() %>%
@@ -204,65 +195,4 @@ gfas.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
 
   return(result)
 }
-
-
-#' Attach fires to a single trajectory run
-#'
-#' @param trajs_run
-#' @param f.sf
-#' @param delay_hour how "old" can a fire be to be accounted for in trajectory
-#'
-#' @return tibble of fires
-#' @export
-#' @examples
-gfas.attach_to_trajs_run <- function(trajs_run, extent, gfas_rs, buffer_km, delay_hour=24){
-
-  if(length(unique(trajs_run$run))>1){
-    stop("This function should only be called for one trajectory run")
-  }
-
-  if(is.null(gfas_rs)){
-    return(tibble(pm25_emission=0))
-  }
-
-  extent.sf <- sf::st_sfc(extent)
-  sf::st_crs(extent.sf) <- sf::st_crs(gfas_rs)
-  extent.sp <- as(extent.sf, "Spatial")
-
-  rs_dates <- as.POSIXct(gfas_rs@z$time)
-
-  trajs_run_date <- split(trajs_run, lubridate::date(trajs_run$traj_dt))
-
-  emissions <- lapply(trajs_run_date,
-                      function(trajs_day){
-                        date <- unique(lubridate::date(trajs_day$traj_dt))
-                        rs_idx <- which(lubridate::date(rs_dates)==date)
-                        if(length(rs_idx)==0){
-                          return(NA)
-                        }
-                        rs_date <- raster::subset(gfas_rs, rs_idx)
-                        raster::extract(rs_date, extent.sp, sum)[[1]]
-                      })
-
-
-  return(tibble(pm25_emission=as.numeric(sum(unlist(emissions), na.rm=T))))
-
-  #
-  #
-  # f.sf %>%
-  #   rs_layers_idx
-  #   filter( %>%
-  #   filter(nrow(.)>0 &   suppressMessages(sf::st_intersects(., extent.sf, sparse = F))) %>%
-  #   as.data.frame() %>%
-  #   select(acq_date, frp) %>%
-  #   full_join(trajs_run,by = character()) %>%
-  #   filter(as.POSIXct(acq_date, tz="UTC") <= traj_dt,
-  #          as.POSIXct(acq_date, tz="UTC") >= traj_dt - lubridate::hours(delay_hour)) %>%
-  #   group_by() %>%
-  #   summarise(
-  #     fire_frp=sum(frp, na.rm=T),
-  #     fire_count=dplyr::n()
-  #   )
-}
-
 
