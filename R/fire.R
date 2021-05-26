@@ -361,7 +361,7 @@ fire.attach_to_trajs_single_rs <- function(trajs_rs, extent, f.sf, delay_hour=24
     group_by() %>%
     summarise_at(
       c("fire_frp","fire_count"),
-      mean,
+      sum,
       na.rm=T)
 }
 
