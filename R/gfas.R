@@ -152,10 +152,10 @@ gfas.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
     filter(!is.na(date_fire))
   print("Done")
 
-  # print("Downloading fires")
-  # gfas.download(date_from=min(mtf$min_date_fire, na.rm=T),
-  #               date_to=max(mtf$max_date_fire, na.rm=T))
-  # print("Done")
+  print("Downloading fires")
+  gfas.download(date_from=min(mtf$date_fire, na.rm=T),
+                date_to=max(mtf$date_fire, na.rm=T))
+  print("Done")
 
   # Read and only keep fires within extent to save memory
   # And per year (or month)
