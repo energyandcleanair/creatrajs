@@ -42,7 +42,8 @@ gfas.download <- function(date_from=NULL, date_to=NULL, region="Global"){
   ecmwf_key = Sys.getenv("ECMWF_API_KEY")
 
   if(ecmwf_user=="" | ecmwf_key==""){
-    stop("Missing ECMWF_API_EMAIL or ECMWF_API_KEY environmental variable")
+    warning("Missing ECMWF_API_EMAIL or ECMWF_API_KEY environmental variable")
+    return(NULL)
   }
 
   options(keyring_backend = "env") # TO AVOID ASKING USER A KEYRING PASSWORD
