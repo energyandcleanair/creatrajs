@@ -38,9 +38,16 @@ gfas.download <- function(date_from=NULL, date_to=NULL, region="Global"){
 
   sets <- split(sets.tbl$date, sets.tbl$set)
 
+  ecmwf_user = Sys.getenv("ECMWF_API_EMAIL")
+  ecmwf_key = Sys.getenv("ECMWF_API_KEY")
+
+  if(ecmwf_user=="" | ecmwf_key==""){
+    stop("Missing ECMWF_API_EMAIL or ECMWF_API_KEY environmental variable")
+  }
+
   options(keyring_backend = "env") # TO AVOID ASKING USER A KEYRING PASSWORD
-  ecmwfr::wf_set_key(user = Sys.getenv("ECMWF_API_EMAIL"), key = Sys.getenv("ECMWF_API_KEY"), service = "webapi")
-  ecmwfr::wf_datasets(Sys.getenv("ECMWF_API_EMAIL"))
+  ecmwfr::wf_set_key(user = ecmwf_user, key = ecmwf_key, service = "webapi")
+  ecmwfr::wf_datasets(ecmwf_user)
 
   lapply(sets, function(set){
     date_from <- min(set)
@@ -65,7 +72,7 @@ gfas.download <- function(date_from=NULL, date_to=NULL, region="Global"){
 
     ecmwfr::wf_request(
       request,
-      Sys.getenv("ECMWF_API_EMAIL"),
+      ecmwf_user,
       transfer = TRUE,
       path = d,
       time_out = 3600*5,
@@ -152,7 +159,7 @@ gfas.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
     filter(!is.na(date_fire))
   print("Done")
 
-  print("Downloading fires")
+  print("Downloading GFAS")
   gfas.download(date_from=min(mtf$date_fire, na.rm=T),
                 date_to=max(mtf$date_fire, na.rm=T))
   print("Done")
