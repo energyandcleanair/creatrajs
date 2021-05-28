@@ -173,6 +173,7 @@ gfas.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
   print("Attaching GFAS (fire_date by fire_date)")
   mtf <- pbapply::pblapply(base::split(mtf, mtf$date_fire),
                             function(x){
+                              print(unique(x$date_fire))
                               extent.sp <- sf::as_Spatial(x$extent[!sf::st_is_empty(x$extent)])
                               gfas_rs <- gfas.read(date_from=min(x$date_fire, na.rm=T),
                                                    date_to=max(x$date_fire, na.rm=T),
