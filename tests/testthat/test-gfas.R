@@ -76,7 +76,10 @@ test_that("attaching gfas - trajectories", {
 
   # Attach GFAS
   tic()
-  mtf <- creatrajs::gfas.attach_to_trajs(mt, buffer_km=buffer_km)
+  mtf <- creatrajs::gfas.attach_to_trajs(mt, buffer_km=buffer_km, terra_or_raster = "terra")
+  toc()
+  tic()
+  mtf <- creatrajs::gfas.attach_to_trajs(mt, buffer_km=buffer_km, terra_or_raster = "raster")
   toc()
   expect_equal(nrow(mt), nrow(mtf))
   expect_true("fires" %in% names(mtf))
@@ -110,7 +113,9 @@ test_that("attaching fire - circular", {
     )
 
   # Attach fire
-  mtf <- fire.attach_to_extents(mt, delay_hour=72)
+  mtf <- fire.attach_to_extents(mt, delay_hour=72, terra_or_raster="terra")
+
+  mtf <- fire.attach_to_extents(mt, delay_hour=72, terra_or_raster="raster")
 
   expect_gt(mtf$fires[[1]]$fire_count, 0)
   expect_gt(mtf$fires[[1]]$fire_frp, 0)

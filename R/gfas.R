@@ -174,7 +174,8 @@ gfas.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
   mtf <- pbapply::pblapply(base::split(mtf, mtf$date_fire),
                             function(x){
                               print(unique(x$date_fire))
-                              extent.sp <- sf::as_Spatial(x$extent[!sf::st_is_empty(x$extent)])
+                              extent.sf <- x$extent[!sf::st_is_empty(x$extent)]
+                              extent.sp <- sf::as_Spatial(extent.sf)
                               gfas_rs <- gfas.read(date_from=min(x$date_fire, na.rm=T),
                                                    date_to=max(x$date_fire, na.rm=T),
                                                    extent.sp=extent.sp,
@@ -182,7 +183,8 @@ gfas.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
                               if(is.null(gfas_rs)){
                                 x$pm25_emission <- 0
                               }else{
-                                x$pm25_emission <- raster::extract(gfas_rs, as(x$extent,"Spatial"), sum)
+                                extract_fn <- exactextractr::exact_extract
+                                x$pm25_emission <- extract_fn(gfas_rs, extent.sf, function(x,w){sum(x*w)})
                               }
                               return(x)
                             }) %>%
