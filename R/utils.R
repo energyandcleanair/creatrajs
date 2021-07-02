@@ -253,3 +253,20 @@ utils.save.meta <- function(filename, date, meas, fires, country, location_id, m
   return(filepath)
 }
 
+#' Adjust field names to be compatible with openair
+#'
+#' @return
+#' @export
+#'
+#' @examples
+utils.convert_to_openair <- function(trajs){
+
+  # Update fields to be compatible with OpenAIR
+  trajs$hour.inc <- trajs$hour_along
+  trajs$date <- trajs$traj_dt_i
+  trajs$date2 <- trajs$traj_dt
+  trajs$year <- lubridate::year(trajs$traj_dt_i)
+  trajs$month <- lubridate::month(trajs$traj_dt_i)
+  trajs$day <- lubridate::date(trajs$traj_dt_i)
+  return(trajs)
+}
