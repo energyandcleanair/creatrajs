@@ -49,9 +49,15 @@ trajs.get <- function(dates,
       if(!is.null(cache_folder) &&
          use_cache &&
          file.exists(file.cache) &&
-         file.info(file.cache)$size > 100){
+         file.info(file.cache)$size > 600){
         # Cache version exists and has data
-        return(readRDS(file.cache))
+        t <- readRDS(file.cache)
+
+        #backward compatibility:
+        if("date" %in% names(t)){
+          t <- t %>% rename(date_recept=date)
+        }
+        return(t)
       }else{
         # Compute trajs
         t <- hysplit.trajs(date=date,
@@ -119,32 +125,131 @@ trajs.get <- function(dates,
 #' @export
 #'
 #' @examples
-trajs.buffer <- function(trajs, buffer_km, merge=T){
+trajs.buffer <- function(trajs, buffer_km, merge=T, group_cols=c("location_id","date","run")){
   tryCatch({
-    b <- suppressMessages(sf::st_as_sf(trajs[!is.na(trajs$lat),],
-                                       coords=c("lon","lat"), crs=4326) %>%
-                       group_by(run) %>%
-                       mutate(n=n()) %>%
-                       filter(n>1) %>% #LINESTRING WITH ONLY ONE POINT CAN'T BE BUFFERED
-                       group_by(run) %>%
-                       arrange(traj_dt) %>%
-                       summarise(do_union = FALSE) %>%
-                       sf::st_cast("LINESTRING") %>%
-                       sf::st_transform(crs=3857) %>%
-                       sf::st_buffer(buffer_km*1000) %>%
-                       # sf::st_bbox() %>%
-                       # sf::st_as_sfc() %>%
-                       sf::st_transform(crs=4326))
+
+
+    if(!all(group_cols %in% names(trajs))){
+      group_cols <- intersect(names(trajs), group_cols)
+      message("Reducing trajs grouping columns to ", group_cols)
+    }
+
+
+    t <- sf::st_as_sf(trajs[!is.na(trajs$lat),],
+                 coords=c("lon","lat"), crs=4326) %>%
+      group_by_at(group_cols) %>%
+      mutate(count=dplyr::n())
+
+    do_buffer <- function(t){
+      suppressMessages(t %>%
+                         sf::st_transform(crs=3857) %>%
+                         sf::st_buffer(buffer_km*1000) %>%
+                         # sf::st_bbox() %>%
+                         # sf::st_as_sfc() %>%
+                         sf::st_transform(crs=4326))
+    }
+
+    t.lines <- t %>%
+      filter(count>1) %>% #LINESTRING WITH ONLY ONE POINT CAN'T BE BUFFERED
+      group_by_at(group_cols) %>%
+      arrange(traj_dt) %>%
+      summarise(do_union = FALSE) %>%
+      sf::st_cast("LINESTRING")
+
+    t.points <- t %>%
+      filter(count==1) %>%
+      select_at(c(group_cols,"geometry"))
+
+    b <- rbind(
+      do_buffer(t.lines),
+      do_buffer(t.points))
 
     if(merge){
       b <- suppressMessages(sf::st_union(b))
     }
+
     return(b)
   }, error=function(c){
+    warning("Failed to buffer trajs: ",c)
     return(NA)
   })
 }
 
+
+
+#' Add a buffer extent to each single trajectory run
+#'
+#' @param trajs
+#' @param buffer_km
+#'
+#' @return
+#' @export
+#'
+#' @examples
+trajs.split_by_run_and_buffer <- function(mt, buffer_km){
+
+  nest_cols <- names(mt) %>%
+    setdiff("trajs")
+
+  trajs <- mt %>%
+    tidyr::unnest(trajs)
+
+  extents <- trajs.buffer(trajs, buffer_km, merge=F) %>%
+    as.data.frame() %>%
+    rename(extent=geometry)
+
+  trajs.run <- trajs %>%
+    mutate(run2=run) %>%
+    group_by_at(c(nest_cols,"run2")) %>%
+    tidyr::nest() %>%
+    rename(trajs=data,
+           run=run2)
+
+  left_join(trajs.run, extents)
+}
+
+#' Add a buffer extent to each single trajectory run
+#'
+#' @param trajs
+#' @param buffer_km
+#'
+#' @return
+#' @export
+#'
+#' @examples
+trajs.split_by_firedate_and_buffer <- function(mt, buffer_km, return_full=F){
+
+  nest_cols <- names(mt) %>%
+    setdiff("trajs")
+
+  print("--unnesting")
+  trajs <- mt %>%
+    tidyr::unnest(trajs) %>%
+    mutate(date_particle=lubridate::date(date_particle))
+
+  print("--buffering")
+  extents <- trajs.buffer(trajs, buffer_km, merge=F, group_cols=c("location_id", "date", "date_particle", "run")) %>%
+    as.data.frame() %>%
+    rename(extent=geometry)
+
+  if(return_full){
+    # With trajectories but much slower
+    print("--nesting")
+    trajs %>%
+      mutate(run2=run) %>%
+      group_by_at(c(nest_cols,"run2")) %>%
+      tidyr::nest() %>%
+      rename(trajs=data,
+             run=run2) %>%
+      left_join(trajs.run, extents)
+  }else{
+    # We keep extent only, much faster
+    print("--distinguishing...")
+    trajs %>%
+      dplyr::distinct_at(c(nest_cols,"run")) %>%
+      left_join(extents)
+  }
+}
 
 trajs.buffer_pts <- function(trajs, buffer_km, res_deg){
 
@@ -163,6 +268,7 @@ trajs.buffer_pts <- function(trajs, buffer_km, res_deg){
       do.call(bind_rows,.) %>%
       sf::st_as_sf()
   }, error=function(c){
+    warning("Failed to buffer trajs pts: ",c)
     return(NA)
   })
 }
@@ -208,7 +314,7 @@ hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timez
 
     # Update fields to be compatible with OpenAIR
     trajs$hour.inc <- trajs$hour_along
-    trajs$date <- trajs$traj_dt_i
+    trajs$date_recept <- trajs$traj_dt_i
     trajs$date_particle <- trajs$traj_dt
     trajs$year <- lubridate::year(trajs$traj_dt_i)
     trajs$month <- lubridate::month(trajs$traj_dt_i)

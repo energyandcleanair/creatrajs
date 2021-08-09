@@ -25,7 +25,9 @@ Imports:
     parallel,
     pbapply,
     pbmcapply,
-    pryr
+    pryr,
+    ecmwfr,
+    exactextractr
 Depends:
     ggplot2,
     ggmap

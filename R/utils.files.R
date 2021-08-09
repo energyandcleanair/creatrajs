@@ -65,3 +65,25 @@ utils.get_firms_subfolder <- function(region="Global"){
   d <- utils.get_firms_folder()
   return(file.path(d, "suomi-npp-viirs-c2", region))
 }
+
+
+#' GFAS folder
+#'
+#' @param region
+#'
+#' @return
+#' @export
+#'
+#' @examples
+utils.get_gfas_folder <- function(){
+  suppressWarnings(try(readRenviron(".Renviron"), silent = T))
+  suppressWarnings(try(dotenv::load_dot_env(), silent = T))
+
+  d <- Sys.getenv("DIR_DATA")
+  if(d==""){
+    stop("DIR_DATA environment variable not defined")
+  }
+
+  return(file.path(d, "gfas"))
+}
+
