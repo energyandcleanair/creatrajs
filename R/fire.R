@@ -400,17 +400,17 @@ fire.attach_to_extents <- function(mt,
   }
 
   print("Attaching fire")
-  mtf$fires <- pbapply::pbmapply(
+  mt$fires <- pbapply::pbmapply(
     fire.attach_to_extent,
-    date=mtf$date,
-    extent=mtf$extent,
+    date=mt$date,
+    extent=mt$extent,
     f.sf=list(f.sf),
     delay_hour=delay_hour,
     SIMPLIFY = F
   )
   print("Done")
 
-  return(mtf)
+  return(mt)
 }
 
 
