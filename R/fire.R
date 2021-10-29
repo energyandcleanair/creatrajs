@@ -33,11 +33,12 @@ fire.download <- function(date_from=NULL, date_to=NULL, region="Global"){
     files.existing <- list.files(d, "*.txt")
     file.todownload <- setdiff(files.all, files.existing)
 
-    modis_key <- Sys.getenv("MODIS_KEY")
+    # To generate EOSDIS Token: https://nrt3.modaps.eosdis.nasa.gov/profile/app-keys
+    eosdis_token <- Sys.getenv("EOSDIS_TOKEN")
     for(f in file.todownload){
       tryCatch({
         cmd <- paste0("wget -e robots=off -nc -np -R .html,.tmp -nH --cut-dirs=5 \"https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/suomi-npp-viirs-c2/", region, "/", f,"\" --header \"Authorization: Bearer ",
-                      modis_key,
+                      eosdis_token,
                       "\" -P ",
                       d)
         system(cmd)
@@ -399,17 +400,17 @@ fire.attach_to_extents <- function(mt,
   }
 
   print("Attaching fire")
-  mtf$fires <- pbapply::pbmapply(
+  mt$fires <- pbapply::pbmapply(
     fire.attach_to_extent,
-    date=mtf$date,
-    extent=mtf$extent,
+    date=mt$date,
+    extent=mt$extent,
     f.sf=list(f.sf),
     delay_hour=delay_hour,
     SIMPLIFY = F
   )
   print("Done")
 
-  return(mtf)
+  return(mt)
 }
 
 
