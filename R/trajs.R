@@ -97,6 +97,18 @@ trajs.get <- function(dates,
     cache_folder <- list(cache_folder)
   }
 
+  # If parallel, we download met files first to avoid concurrency conflict
+  if(parallel){
+    dir_hysplit_met <- Sys.getenv("DIR_HYSPLIT_MET", here::here(utils.get_cache_folder("weather")))
+    splitr::download_met_files(
+      met_type = met_type,
+      days = as.Date(dates),
+      duration = duration_hour,
+      direction = "backward",
+      met_dir = dir_hysplit_met
+    )
+  }
+
   trajs<- mapply_(
     trajs.get.one,
     date=dates,

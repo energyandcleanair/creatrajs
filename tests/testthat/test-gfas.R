@@ -76,11 +76,9 @@ test_that("attaching gfas - trajectories", {
 
   # Attach GFAS
   tic()
-  mtf <- creatrajs::gfas.attach_to_trajs(mt, buffer_km=buffer_km, terra_or_raster = "terra")
+  mtf <- creatrajs::gfas.attach_to_trajs(mt, buffer_km=buffer_km)
   toc()
-  tic()
-  mtf <- creatrajs::gfas.attach_to_trajs(mt, buffer_km=buffer_km, terra_or_raster = "raster")
-  toc()
+
   expect_equal(nrow(mt), nrow(mtf))
   expect_true("fires" %in% names(mtf))
   expect_gt(mtf$fires[[1]]$pm25_emission, 0)

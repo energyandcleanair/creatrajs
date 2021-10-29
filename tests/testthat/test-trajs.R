@@ -45,9 +45,9 @@ test_that("parallel works", {
   date_to = "2020-01-10"
   dates = seq.Date(as.Date(date_from), as.Date(date_to), by="day")
 
-  m <- rcrea::measurements(city="Lahore",
+  m <- rcrea::measurements(city="Delhi",
                            poll="pm25",
-                           source="openaq_government",
+                           source="cpcb",
                            date_from = date_from,
                            date_to = date_to,
                            process_id="city_day_mad",
