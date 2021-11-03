@@ -40,17 +40,18 @@ test_that("getting fire works", {
 
 test_that("attaching fire - trajectories. Both vector and raster", {
 
-  require(rcrea)
-  require(testthat)
-  require(tictoc)
+  library(rcrea)
+  library(testthat)
+  library(tictoc)
+  library(tidyverse)
 
   date_from  <- "2020-01-05"
-  date_to  <- "2020-01-15"
+  date_to  <- "2020-01-10"
   buffer_km <- 10
 
-  m <- rcrea::measurements(city="Lahore",
+  m <- rcrea::measurements(city="Delhi",
                            poll="pm25",
-                           source="openaq_government",
+                           source="cpcb",
                            date_from = date_from,
                            date_to = date_to,
                            process_id="city_day_mad",
@@ -58,7 +59,7 @@ test_that("attaching fire - trajectories. Both vector and raster", {
   )
 
   creatrajs::fire.download(
-    date_from as.Date(date_from)-1,
+    date_from=as.Date(date_from)-1,
     date_to=date_to,
     region="Global")
 
@@ -75,7 +76,7 @@ test_that("attaching fire - trajectories. Both vector and raster", {
                             met_type = "gdas1",
                             heights = 500,
                             duration_hour = 72,
-                            hours = seq(0,23)
+                            hours = c(0,3,6), #seq(0,23)
                             # cache_folder = utils.get_cache_folder("trajs")
                            )
       )
@@ -84,6 +85,15 @@ test_that("attaching fire - trajectories. Both vector and raster", {
   tic()
   mtf <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km)
   toc()
+
+  # A larger one
+  mt_large <- lapply(seq(1,20), function(d) mt %>% mutate(date=date - d*(max(date)-min(date)))) %>%
+    do.call(bind_rows, .)
+  tic()
+  mtf <- creatrajs::fire.attach_to_trajs(mt_large, buffer_km=buffer_km)
+  toc()
+
+
   expect_equal(nrow(mt), nrow(mtf))
   expect_true("fires" %in% names(mtf))
   expect_gt(mtf$fires[[1]]$fire_count, 0)

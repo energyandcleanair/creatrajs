@@ -200,24 +200,32 @@ trajs.buffer <- function(trajs, buffer_km, merge=T, group_cols=c("location_id","
 #' @examples
 trajs.split_by_run_and_buffer <- function(mt, buffer_km){
 
+
+  # Test
   nest_cols <- names(mt) %>%
     setdiff("trajs")
 
   trajs <- mt %>%
-    tidyr::unnest(trajs)
+    tidyr::unnest(trajs) %>%
+    mutate(date_fire=lubridate::date(date_particle))
 
-  extents <- trajs.buffer(trajs, buffer_km, merge=F) %>%
+  extents <- trajs.buffer(trajs, buffer_km, group_cols = c("location_id","date","date_fire","run"), merge=F) %>%
     as.data.frame() %>%
     rename(extent=geometry)
 
-  trajs.run <- trajs %>%
-    mutate(run2=run) %>%
-    group_by_at(c(nest_cols,"run2")) %>%
-    tidyr::nest() %>%
-    rename(trajs=data,
-           run=run2)
-
-  left_join(trajs.run, extents)
+  # tic()
+  # trajs.run <- trajs %>%
+  #   mutate(run2=run) %>%
+  #   group_by_at(c(nest_cols,"run2")) %>%
+  #   tidyr::nest() %>%
+  #   rename(trajs=data,
+  #          run=run2)
+  # toc()
+  #
+  # tic()
+  # left_join(trajs.run, extents)
+  # toc()
+  return(extents)
 }
 
 #' Add a buffer extent to each single trajectory run
