@@ -162,30 +162,26 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
   # Split by run
   print("Splitting by run")
   mtf <- trajs.split_by_run_and_buffer(mt, buffer_km) %>%
-    rowwise() %>%
-    mutate(min_date_fire=min(trajs$traj_dt, na.rm=T)-lubridate::hours(delay_hour),
-           max_date_fire=max(trajs$traj_dt, na.rm=T)
-    ) %>%
-    filter(!is.na(min_date_fire))
+    filter(!is.na(date_fire))
   print("Done")
 
   print("Downloading fires")
-  fire.download(date_from=min(mtf$min_date_fire, na.rm=T),
-                date_to=max(mtf$max_date_fire, na.rm=T))
+  fire.download(date_from=min(mtf$date_fire, na.rm=T),
+                date_to=max(mtf$date_fire, na.rm=T))
   print("Done")
 
   # Read and only keep fires within extent to save memory
   # And per year (or month)
   date_group_fn <- function(x) strftime(x,"%Y%m") # Can be year, month, or even date (lot of redundancy in the latter case)
-  mtf$date_group <- date_group_fn(mtf$max_date_fire)
+  mtf$date_group <- date_group_fn(mtf$date_fire)
 
   print("Attaching fires (month by month)")
   mtf <- pbapply::pblapply(base::split(mtf, mtf$date_group),
          function(mtf){
 
            extent.sp <- sf::as_Spatial(mtf$extent[!sf::st_is_empty(mtf$extent)])
-           f.sf <- fire.read(date_from=min(mtf$min_date_fire, na.rm=T)-lubridate::days(1),
-                             date_to=max(mtf$max_date_fire, na.rm=T),
+           f.sf <- fire.read(date_from=min(mtf$date_fire, na.rm=T)-lubridate::days(1),
+                             date_to=max(mtf$date_fire, na.rm=T),
                              extent.sp=extent.sp,
                              show.progress=F)
 
@@ -195,7 +191,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
 
            mtf$fires <- mapply(
              fire.attach_to_trajs_run,
-             trajs_run=mtf$trajs,
+             date_fire=mtf$date_fire,
              extent=mtf$extent,
              f.sf=list(f.sf),
              delay_hour=delay_hour,
@@ -232,11 +228,11 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
 #' @return tibble of fires
 #'
 #' @examples
-fire.attach_to_trajs_run <- function(trajs_run, extent, f.sf, delay_hour=24){
+fire.attach_to_trajs_run <- function(date_fire, extent, f.sf, delay_hour=24){
 
-  if(length(unique(trajs_run$run))>1){
-    stop("This function should only be called for one trajectory run")
-  }
+  # if(length(unique(trajs_run$run))>1){
+  #   stop("This function should only be called for one trajectory run")
+  # }
 
   if(nrow(f.sf)==0){
     return(tibble(fire_frp=0, fire_count=0))
@@ -246,14 +242,15 @@ fire.attach_to_trajs_run <- function(trajs_run, extent, f.sf, delay_hour=24){
   sf::st_crs(extent.sf) <- sf::st_crs(f.sf)
 
   f.sf %>%
-    filter(acq_date <= max(trajs_run$traj_dt, na.rm=T),
-           acq_date >= min(trajs_run$traj_dt, na.rm=T) - lubridate::hours(delay_hour)) %>%
-    filter(nrow(.)>0 &   suppressMessages(sf::st_intersects(., extent.sf, sparse = F))) %>%
+    # TODO devise a more accurate way yet not as slow as fully granular method
+    filter(acq_date <= lubridate::date(date_fire),
+           acq_date >= lubridate::date(date_fire) - lubridate::hours(delay_hour)) %>%
+    filter(nrow(.)>0 & suppressMessages(sf::st_intersects(., extent.sf, sparse = F))) %>%
      as.data.frame() %>%
   select(acq_date, frp) %>%
-  full_join(trajs_run,by = character()) %>%
-  filter(as.POSIXct(acq_date, tz="UTC") <= traj_dt,
-         as.POSIXct(acq_date, tz="UTC") >= traj_dt - lubridate::hours(delay_hour)) %>%
+  # full_join(trajs_run, by = character()) %>%
+  # filter(as.POSIXct(acq_date, tz="UTC") <= traj_dt,
+  #        as.POSIXct(acq_date, tz="UTC") >= traj_dt - lubridate::hours(delay_hour)) %>%
   group_by() %>%
   summarise(
     fire_frp=sum(frp, na.rm=T),
