@@ -100,6 +100,7 @@ trajs.get <- function(dates,
   # If parallel, we download met files first to avoid concurrency conflict
   if(parallel){
     dir_hysplit_met <- Sys.getenv("DIR_HYSPLIT_MET", here::here(utils.get_cache_folder("weather")))
+    print(paste("Downloading weather data into", dir_hysplit_met))
     splitr::download_met_files(
       met_type = met_type,
       days = as.Date(dates),
