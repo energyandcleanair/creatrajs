@@ -108,6 +108,7 @@ trajs.get <- function(dates,
       direction = "backward",
       met_dir = dir_hysplit_met
     )
+    print("Done")
   }
 
   trajs<- mapply_(
