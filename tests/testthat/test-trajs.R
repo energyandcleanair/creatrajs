@@ -146,25 +146,26 @@ test_that("trajectories cache system works", {
   require(rcrea)
   require(testthat)
 
-  m <- rcrea::measurements(city="Lahore",
+  m <- rcrea::measurements(city="Delhi",
                            poll="pm25",
-                           source="openaq_government",
+                           source="cpcb",
                            date_from = "2020-01-01",
-                           date_to = "2020-01-01",
+                           date_to = "2020-01-05",
                            process_id="city_day_mad",
                            with_geometry=T
   )
 
 
   # Run first time
-  creatrajs::trajs.get(dates="2020-01-05",
+  creatrajs::trajs.get(dates= m$date,
                        geometry = m$geometry,
                        location_id = m$location_id,
                        country = m$country,
                        met_type = "gdas1",
                        heights = 500,
                        duration_hour = 72,
-                       cache_folder = utils.get_cache_folder()
+                       cache_folder = utils.get_cache_folder(),
+                       parallel=T
   )
 
   # Run second time
@@ -176,7 +177,8 @@ test_that("trajectories cache system works", {
                                   met_type = "gdas1",
                                   heights = 500,
                                   duration_hour = 72,
-                                  cache_folder = utils.get_cache_folder("trajs")
+                                  cache_folder = utils.get_cache_folder("trajs"),
+                                  parallel=T
   )
   t.duration <- Sys.time() - start
 
