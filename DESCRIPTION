@@ -27,7 +27,8 @@ Imports:
     pbmcapply,
     pryr,
     ecmwfr,
-    exactextractr
+    exactextractr,
+    here
 Depends:
     ggplot2,
     ggmap
