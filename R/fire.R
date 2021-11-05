@@ -178,22 +178,26 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24, parallel=T){
   print("Attaching fires (month by month)")
   mtf <- pbmcapply::pbmclapply(base::split(mtf, mtf$date_group),
          function(mtf){
+           tryCatch({
+             extent.sp <- sf::as_Spatial(mtf$extent[!sf::st_is_empty(mtf$extent)])
+             f.sf <- fire.read(date_from=min(mtf$date_fire, na.rm=T)-lubridate::days(1),
+                               date_to=max(mtf$date_fire, na.rm=T),
+                               extent.sp=extent.sp,
+                               show.progress=F)
 
-           extent.sp <- sf::as_Spatial(mtf$extent[!sf::st_is_empty(mtf$extent)])
-           f.sf <- fire.read(date_from=min(mtf$date_fire, na.rm=T)-lubridate::days(1),
-                             date_to=max(mtf$date_fire, na.rm=T),
-                             extent.sp=extent.sp,
-                             show.progress=F)
-
-           mtf$fires <- mapply(
-             fire.attach_to_trajs_run,
-             date_fire=mtf$date_fire,
-             extent=mtf$extent,
-             f.sf=list(f.sf),
-             delay_hour=delay_hour,
-             SIMPLIFY = F
-           )
-           return(mtf)
+             mtf$fires <- mapply(
+               fire.attach_to_trajs_run,
+               date_fire=mtf$date_fire,
+               extent=mtf$extent,
+               f.sf=list(f.sf),
+               delay_hour=delay_hour,
+               SIMPLIFY = F
+             )
+             return(mtf)
+           }, error=function(e){
+             warning("Failed to attach fire to trajectories: ", e, "\n: ", mtf)
+             return(NULL)
+           })
          }, mc.cores = ifelse(parallel, parallel::detectCores()-1, 1)) %>%
     do.call(bind_rows,.)
 
