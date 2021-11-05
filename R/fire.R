@@ -153,7 +153,7 @@ fire.summary <- function(date, extent, duration_hour, f.sf){
 #' @return
 #' @export
 #'
-fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
+fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24, parallel=T){
 
   if(!all(c("location_id", "date", "trajs") %in% names(mt))){
     stop("wt should  contain the following columns: ",paste("location_id", "date", "trajs"))
@@ -176,7 +176,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
   mtf$date_group <- date_group_fn(mtf$date_fire)
 
   print("Attaching fires (month by month)")
-  mtf <- pbapply::pblapply(base::split(mtf, mtf$date_group),
+  mtf <- pbmcapply::pbmclapply(base::split(mtf, mtf$date_group),
          function(mtf){
 
            extent.sp <- sf::as_Spatial(mtf$extent[!sf::st_is_empty(mtf$extent)])
@@ -184,10 +184,6 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
                              date_to=max(mtf$date_fire, na.rm=T),
                              extent.sp=extent.sp,
                              show.progress=F)
-
-           # if(nrow(f.sf)==0){
-           #   warning("No fire found. Something's probably wrong")
-           # }
 
            mtf$fires <- mapply(
              fire.attach_to_trajs_run,
@@ -198,7 +194,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
              SIMPLIFY = F
            )
            return(mtf)
-         }) %>%
+         }, mc.cores = ifelse(parallel, parallel::detectCores()-1, 1)) %>%
     do.call(bind_rows,.)
 
   print("Regroup by day (join runs")
