@@ -60,7 +60,7 @@ fire.download <- function(date_from=NULL, date_to=NULL, region="Global"){
 #' @export
 #'
 #' @examples
-fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=NULL, show.progress=T){
+fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=NULL, show.progress=T, parallel=T){
 
   d <- utils.get_firms_subfolder(region=region)
 
@@ -120,7 +120,10 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
     })
   }
 
-  lapply_ <- ifelse(show.progress, pbmcapply::pbmclapply, parallel::mclapply)
+  lapply_ <- ifelse(show.progress,
+                    ifelse(parallel, pbmcapply::pbmclapply, pbapply::pblapply),
+                    ifelse(parallel, parallel::mclapply, lapply))
+
   fires <- do.call("bind_rows",
                    lapply_(sort(files[!is.na(files)]), # Sort to read fire_global* first
                                          read.csv.fire,
@@ -183,7 +186,8 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24, parallel=T){
              f.sf <- fire.read(date_from=min(mtf$date_fire, na.rm=T)-lubridate::days(1),
                                date_to=max(mtf$date_fire, na.rm=T),
                                extent.sp=extent.sp,
-                               show.progress=F)
+                               show.progress=F,
+                               parallel=F)
 
              mtf$fires <- mapply(
                fire.attach_to_trajs_run,
