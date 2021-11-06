@@ -184,6 +184,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
   mtf <- pbmcapply::pbmclapply(base::split(mtf, mtf$date_group),
          function(mtf){
            tryCatch({
+             print(unique(mtf$date_group))
              extent.sp <- sf::as_Spatial(mtf$extent[!sf::st_is_empty(mtf$extent)])
              f.sf <- fire.read(date_from=min(mtf$date_fire, na.rm=T)-lubridate::days(1),
                                date_to=max(mtf$date_fire, na.rm=T),
