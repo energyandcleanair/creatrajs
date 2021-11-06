@@ -120,14 +120,12 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
     })
   }
 
-  lapply_ <- ifelse(show.progress,
-                    ifelse(parallel, pbmcapply::pbmclapply, pbapply::pblapply),
-                    ifelse(parallel, parallel::mclapply, lapply))
+  lapply_ <- ifelse(show.progress, pbmcapply::pbmclapply, parallel::mclapply)
 
   fires <- do.call("bind_rows",
                    lapply_(sort(files[!is.na(files)]), # Sort to read fire_global* first
                                          read.csv.fire,
-                                         mc.cores = parallel::detectCores()-1))
+                                         mc.cores = ifelse(parallel, parallel::detectCores()-1, 1)))
   fires
 }
 
