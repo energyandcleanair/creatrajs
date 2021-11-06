@@ -22,7 +22,7 @@ trajs.get <- function(dates,
                       timezone="UTC",
                       use_cache=T, # If False, will not read cache BUT will try to write in it
                       cache_folder=NULL,
-                      parallel=F, # NOT TOTALLY WORKING YET (weather download at least is an issue)
+                      parallel=F,
                       mc.cores=max(parallel::detectCores()-1,1),
                       debug=T,
                       ...){

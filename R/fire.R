@@ -60,7 +60,9 @@ fire.download <- function(date_from=NULL, date_to=NULL, region="Global"){
 #' @export
 #'
 #' @examples
-fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=NULL, show.progress=T, parallel=T){
+fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=NULL, show.progress=T,
+                      parallel=T,
+                      mc.cores=max(parallel::detectCores()-1,1)){
 
   d <- utils.get_firms_subfolder(region=region)
 
@@ -124,8 +126,8 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
 
   fires <- do.call("bind_rows",
                    lapply_(sort(files[!is.na(files)]), # Sort to read fire_global* first
-                                         read.csv.fire,
-                                         mc.cores = ifelse(parallel, parallel::detectCores()-1, 1)))
+                           read.csv.fire,
+                           mc.cores = ifelse(parallel, mc.cores, 1)))
   fires
 }
 
@@ -154,7 +156,9 @@ fire.summary <- function(date, extent, duration_hour, f.sf){
 #' @return
 #' @export
 #'
-fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24, parallel=T){
+fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
+                                 parallel=T,
+                                 mc.cores=max(parallel::detectCores()-1,1)){
 
   if(!all(c("location_id", "date", "trajs") %in% names(mt))){
     stop("wt should  contain the following columns: ",paste("location_id", "date", "trajs"))
@@ -200,7 +204,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24, parallel=T){
              warning("Failed to attach fire to trajectories: ", e, "\n: ", mtf)
              return(NULL)
            })
-         }, mc.cores = ifelse(parallel, parallel::detectCores()-1, 1)) %>%
+         }, mc.cores = ifelse(parallel, mc.cores,1)) %>%
     do.call(bind_rows,.)
 
   print("Regroup by day (join runs")
