@@ -206,9 +206,10 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
              return(NULL)
            })
          }, mc.cores = ifelse(parallel, mc.cores,1)) %>%
+    subset(unlist(lapply(., is.data.frame))) %>% # Sometimes a core fails
     do.call(bind_rows,.)
 
-  print("Regroup by day (join runs")
+  print("Regroup by day (join runs)")
   result <- mt %>%
     left_join(
       mtf %>%
@@ -514,7 +515,7 @@ fire.attach_to_disps <- function(mt, buffer_km=10, delay_hour=24){
                            }) %>%
     do.call(bind_rows,.)
 
-  print("Regroup by day (join runs")
+  print("Regroup by day (join runs)")
   result <- mt %>%
     left_join(
       mtf %>%
