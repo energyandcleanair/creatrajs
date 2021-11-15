@@ -86,6 +86,12 @@ test_that("attaching fire - trajectories. Both vector and raster", {
   mtf <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km)
   toc()
 
+  # Attach fire when trajectories are wrong
+  tic()
+  mt_onetraj <- mt %>% rowwise() %>% mutate(trajs=list(head(trajs, 1)))
+  mtf_onetraj <- creatrajs::fire.attach_to_trajs(mt_onetraj, buffer_km=buffer_km)
+  toc()
+
   # A larger one
   mt_large <- lapply(seq(1,20), function(d) mt %>% mutate(date=date - d*(max(date)-min(date)))) %>%
     do.call(bind_rows, .)
@@ -168,3 +174,15 @@ test_that("attaching fire - circular", {
   expect_gt(mtf$fires[[1]]$fire_count, 0)
   expect_gt(mtf$fires[[1]]$fire_frp, 0)
 })
+
+
+test_that("summarising fires", {
+
+  library(creahelpers)
+
+  g <- creahelpers::get_adm(level=1, iso2s="IN")
+  date_from <- "2021-11-01"
+  date_to <- "2021-11-03"
+
+
+

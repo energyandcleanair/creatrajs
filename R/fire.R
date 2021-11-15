@@ -109,7 +109,7 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
       # Keep only in extent if indicated
       if(!is.null(extent.sp)){
         sp::proj4string(extent.sp) <- sp::proj4string(df)
-        df <- df[!is.na(sp::over(df, extent.sp)),]
+        df <- df[!is.na(sp::over(df, as(extent.sp,"SpatialPolygons"))),]
       }
 
       df %>%
@@ -531,4 +531,33 @@ fire.attach_to_disps <- function(mt, buffer_km=10, delay_hour=24){
   print("Done")
 
   return(result)
+}
+
+
+#' Count fires and sum FRP within geometries for every day between date_from and date_to
+#'
+#' @param date_from
+#' @param date_to
+#' @param geometries either a sf or sp
+#'
+#' @return
+#' @export
+#'
+#' @examples
+fire.aggregate <- function(date_from, date_to, geometries){
+
+  sp <- creahelpers::to_spdf(geometries)
+  creatrajs::fire.download(date_from, date_to)
+  fires <- creatrajs::fire.read(date_from=date_from, date_to=date_to, extent.sp = sp)
+
+  cbind(
+    as.data.frame(fires) %>% select(-c(geometry)),
+    sp::over(as(fires, "Spatial"), sp, returnList = F)) %>%
+    rename(date=acq_date) %>%
+    group_by_at(setdiff(names(.), "frp")) %>%
+    summarise(
+      frp=sum(frp),
+      count=n()
+    ) %>%
+    ungroup()
 }
