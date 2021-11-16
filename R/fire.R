@@ -466,10 +466,6 @@ fire.attach_to_disps <- function(mt, buffer_km=10, delay_hour=24){
   }
 
 
-
-
-
-
   # Split by run
   print("Splitting by run")
   mtf <- mt %>%
@@ -544,11 +540,14 @@ fire.attach_to_disps <- function(mt, buffer_km=10, delay_hour=24){
 #' @export
 #'
 #' @examples
-fire.aggregate <- function(date_from, date_to, geometries){
+fire.aggregate <- function(date_from, date_to, geometries, fires=NULL){
 
   sp <- creahelpers::to_spdf(geometries)
-  creatrajs::fire.download(date_from, date_to)
-  fires <- creatrajs::fire.read(date_from=date_from, date_to=date_to, extent.sp = sp)
+
+  if(is.null(fires)){
+    creatrajs::fire.download(date_from, date_to)
+    fires <- creatrajs::fire.read(date_from=date_from, date_to=date_to, extent.sp = sp)
+  }
 
   cbind(
     as.data.frame(fires) %>% select(-c(geometry)),
@@ -560,4 +559,55 @@ fire.aggregate <- function(date_from, date_to, geometries){
       count=n()
     ) %>%
     ungroup()
+}
+
+
+#' Count fires and sum FRP within geometries for every day between date_from and date_to
+#'
+#' @param date_from
+#' @param date_to
+#' @param geometry either a sf or sp
+#'
+#' @return
+#' @export
+#'
+#' @examples
+fire.heatmap <- function(fires, geometry, zoom=7, facet_by="year"){
+
+  ggmap::register_google(Sys.getenv("GOOGLE_MAP_API_KEY"))
+
+  fires_df <- st_intersection(fires, st_as_sfc(st_bbox(geometry))) %>%
+    cbind(., st_coordinates(.$geometry)) %>%
+    as.data.frame() %>%
+    select(-c(geometry)) %>%
+    mutate(year=factor(lubridate::year(acq_date)))
+
+  # Plot map
+  plt <- ggmap::qmplot(x=X, y=Y,
+         data = fires_df,
+         maptype = "satellite",
+         mapcolor="bw",
+         color=I('darkred'),
+         zoom=zoom,
+         source = "google",
+         xlim=sf::st_bbox(geometry)[c(1,3)],
+         ylim=sf::st_bbox(geometry)[c(2,4)],
+         darken = .7,
+         legend = "topright") +
+    stat_density_2d(aes(fill = ..level..),
+                    geom = "polygon",
+                    alpha = .3,
+                    color = NA,
+                    adjust=0.9) +
+    scale_fill_distiller(palette="Reds") +
+    geom_sf(data=sf::st_as_sf(geometries),
+            inherit.aes = F,
+            fill="transparent",
+            color="#FFFFFF44")
+
+  if(!is.null(facet_by)){
+    plt <- plt + facet_wrap(as.formula(paste(".~ ", facet_by)))
+  }
+
+  return(plt)
 }

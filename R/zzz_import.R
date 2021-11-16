@@ -13,5 +13,5 @@ NULL
 
 # ' Pseudo-function to import sf functions
 #'
-#' @importFrom sf st_as_sf st_coordinates st_as_sfc st_buffer st_union st_centroid
+#' @importFrom sf st_as_sf st_coordinates st_as_sfc st_buffer st_union st_centroid st_bbox st_intersection
 NULL
