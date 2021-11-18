@@ -190,7 +190,7 @@ gfas.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
                             }) %>%
     do.call(bind_rows,.)
 
-  print("Regroup by day (join runs")
+  print("Regroup by day (join runs)")
   result <- mt %>%
     left_join(
       mtf %>%

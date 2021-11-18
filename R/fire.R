@@ -60,7 +60,9 @@ fire.download <- function(date_from=NULL, date_to=NULL, region="Global"){
 #' @export
 #'
 #' @examples
-fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=NULL, show.progress=T){
+fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=NULL, show.progress=T,
+                      parallel=T,
+                      mc.cores=max(parallel::detectCores()-1,1)){
 
   d <- utils.get_firms_subfolder(region=region)
 
@@ -107,7 +109,7 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
       # Keep only in extent if indicated
       if(!is.null(extent.sp)){
         sp::proj4string(extent.sp) <- sp::proj4string(df)
-        df <- df[!is.na(sp::over(df, extent.sp)),]
+        df <- df[!is.na(sp::over(df, as(extent.sp,"SpatialPolygons"))),]
       }
 
       df %>%
@@ -121,10 +123,11 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
   }
 
   lapply_ <- ifelse(show.progress, pbmcapply::pbmclapply, parallel::mclapply)
+
   fires <- do.call("bind_rows",
                    lapply_(sort(files[!is.na(files)]), # Sort to read fire_global* first
-                                         read.csv.fire,
-                                         mc.cores = parallel::detectCores()-1))
+                           read.csv.fire,
+                           mc.cores = ifelse(parallel, mc.cores, 1)))
   fires
 }
 
@@ -153,7 +156,9 @@ fire.summary <- function(date, extent, duration_hour, f.sf){
 #' @return
 #' @export
 #'
-fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
+fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
+                                 parallel=T,
+                                 mc.cores=max(parallel::detectCores()-1,1)){
 
   if(!all(c("location_id", "date", "trajs") %in% names(mt))){
     stop("wt should  contain the following columns: ",paste("location_id", "date", "trajs"))
@@ -176,32 +181,35 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
   mtf$date_group <- date_group_fn(mtf$date_fire)
 
   print("Attaching fires (month by month)")
-  mtf <- pbapply::pblapply(base::split(mtf, mtf$date_group),
+  mtf <- pbmcapply::pbmclapply(base::split(mtf, mtf$date_group),
          function(mtf){
+           tryCatch({
+             print(unique(mtf$date_group))
+             extent.sp <- sf::as_Spatial(mtf$extent[!sf::st_is_empty(mtf$extent)])
+             f.sf <- fire.read(date_from=min(mtf$date_fire, na.rm=T)-lubridate::days(1),
+                               date_to=max(mtf$date_fire, na.rm=T),
+                               extent.sp=extent.sp,
+                               show.progress=F,
+                               parallel=F)
 
-           extent.sp <- sf::as_Spatial(mtf$extent[!sf::st_is_empty(mtf$extent)])
-           f.sf <- fire.read(date_from=min(mtf$date_fire, na.rm=T)-lubridate::days(1),
-                             date_to=max(mtf$date_fire, na.rm=T),
-                             extent.sp=extent.sp,
-                             show.progress=F)
-
-           # if(nrow(f.sf)==0){
-           #   warning("No fire found. Something's probably wrong")
-           # }
-
-           mtf$fires <- mapply(
-             fire.attach_to_trajs_run,
-             date_fire=mtf$date_fire,
-             extent=mtf$extent,
-             f.sf=list(f.sf),
-             delay_hour=delay_hour,
-             SIMPLIFY = F
-           )
-           return(mtf)
-         }) %>%
+             mtf$fires <- mapply(
+               fire.attach_to_trajs_run,
+               date_fire=mtf$date_fire,
+               extent=mtf$extent,
+               f.sf=list(f.sf),
+               delay_hour=delay_hour,
+               SIMPLIFY = F
+             )
+             return(mtf)
+           }, error=function(e){
+             warning("Failed to attach fire to trajectories: ", e, "\n: ", mtf)
+             return(NULL)
+           })
+         }, mc.cores = ifelse(parallel, mc.cores,1)) %>%
+    subset(unlist(lapply(., is.data.frame))) %>% # Sometimes a core fails
     do.call(bind_rows,.)
 
-  print("Regroup by day (join runs")
+  print("Regroup by day (join runs)")
   result <- mt %>%
     left_join(
       mtf %>%
@@ -456,10 +464,6 @@ fire.attach_to_disps <- function(mt, buffer_km=10, delay_hour=24){
   }
 
 
-
-
-
-
   # Split by run
   print("Splitting by run")
   mtf <- mt %>%
@@ -505,7 +509,7 @@ fire.attach_to_disps <- function(mt, buffer_km=10, delay_hour=24){
                            }) %>%
     do.call(bind_rows,.)
 
-  print("Regroup by day (join runs")
+  print("Regroup by day (join runs)")
   result <- mt %>%
     left_join(
       mtf %>%
@@ -521,4 +525,87 @@ fire.attach_to_disps <- function(mt, buffer_km=10, delay_hour=24){
   print("Done")
 
   return(result)
+}
+
+
+#' Count fires and sum FRP within geometries for every day between date_from and date_to
+#'
+#' @param date_from
+#' @param date_to
+#' @param geometries either a sf or sp
+#'
+#' @return
+#' @export
+#'
+#' @examples
+fire.aggregate <- function(date_from, date_to, geometries, fires=NULL){
+
+  sp <- creahelpers::to_spdf(geometries)
+
+  if(is.null(fires)){
+    creatrajs::fire.download(date_from, date_to)
+    fires <- creatrajs::fire.read(date_from=date_from, date_to=date_to, extent.sp = sp)
+  }
+
+  cbind(
+    as.data.frame(fires) %>% select(-c(geometry)),
+    sp::over(as(fires, "Spatial"), sp, returnList = F)) %>%
+    rename(date=acq_date) %>%
+    group_by_at(setdiff(names(.), "frp")) %>%
+    summarise(
+      frp=sum(frp),
+      count=n()
+    ) %>%
+    ungroup()
+}
+
+
+#' Count fires and sum FRP within geometries for every day between date_from and date_to
+#'
+#' @param date_from
+#' @param date_to
+#' @param geometry either a sf or sp
+#'
+#' @return
+#' @export
+#'
+#' @examples
+fire.heatmap <- function(fires, geometry, zoom=7, facet_by="year"){
+
+  ggmap::register_google(Sys.getenv("GOOGLE_MAP_API_KEY"))
+
+  fires_df <- st_intersection(fires, st_as_sfc(st_bbox(geometry))) %>%
+    cbind(., st_coordinates(.$geometry)) %>%
+    as.data.frame() %>%
+    select(-c(geometry)) %>%
+    mutate(year=factor(lubridate::year(acq_date)))
+
+  # Plot map
+  plt <- ggmap::qmplot(x=X, y=Y,
+         data = fires_df,
+         maptype = "satellite",
+         mapcolor="bw",
+         color=I('darkred'),
+         zoom=zoom,
+         source = "google",
+         xlim=sf::st_bbox(geometry)[c(1,3)],
+         ylim=sf::st_bbox(geometry)[c(2,4)],
+         darken = .7,
+         legend = "topright") +
+    stat_density_2d(aes(fill = ..level..),
+                    geom = "polygon",
+                    alpha = .3,
+                    color = NA,
+                    adjust=0.9) +
+    scale_fill_distiller(palette="Reds") +
+    geom_sf(data=sf::st_as_sf(geometries),
+            inherit.aes = F,
+            fill="transparent",
+            color="#FFFFFF44")
+
+  if(!is.null(facet_by)){
+    plt <- plt + facet_wrap(as.formula(paste(".~ ", facet_by)))
+  }
+
+  return(plt)
 }

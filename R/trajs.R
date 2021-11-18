@@ -22,7 +22,7 @@ trajs.get <- function(dates,
                       timezone="UTC",
                       use_cache=T, # If False, will not read cache BUT will try to write in it
                       cache_folder=NULL,
-                      parallel=F, # NOT TOTALLY WORKING YET (weather download at least is an issue)
+                      parallel=F,
                       mc.cores=max(parallel::detectCores()-1,1),
                       debug=T,
                       ...){
@@ -99,15 +99,29 @@ trajs.get <- function(dates,
 
   # If parallel, we download met files first to avoid concurrency conflict
   if(parallel){
+
+    # But we only download those for trajectories we need to compute
+    if(!is.null(cache_folder)){
+      files.cache <- file.path(cache_folder,
+        trajs.cache_filename(location_id, met_type, heights, duration_hour, dates))
+
+      missing_dates <- dates[!file.exists(files.cache)]
+    }else{
+      missing_dates <- dates
+    }
+
+
     dir_hysplit_met <- Sys.getenv("DIR_HYSPLIT_MET", here::here(utils.get_cache_folder("weather")))
     print(paste("Downloading weather data into", dir_hysplit_met))
-    splitr::download_met_files(
-      met_type = met_type,
-      days = as.Date(dates),
-      duration = duration_hour,
-      direction = "backward",
-      met_dir = dir_hysplit_met
-    )
+    if(length(missing_dates)){
+      splitr::download_met_files(
+        met_type = met_type,
+        days = as.Date(missing_dates),
+        duration = duration_hour,
+        direction = "backward",
+        met_dir = dir_hysplit_met
+      )
+    }
     print("Done")
   }
 
