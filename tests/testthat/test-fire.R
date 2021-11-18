@@ -83,7 +83,22 @@ test_that("attaching fire - trajectories. Both vector and raster", {
 
   # Attach fire: vector method
   tic()
-  mtf <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km)
+  mtf <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=F)
+  expect_equal(
+    lapply(mtf$fires, names) %>% unlist() %>% unique() %>% sort(),
+    c("fire_count", "fire_frp"))
+  names(mtf$fires[[1]])
+
+
+  toc()
+
+  tic()
+  mtf <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=T)
+  expect_equal(
+    lapply(mtf$fires, names) %>% unlist() %>% unique() %>% sort(),
+    c("fire_count_dayminus0", "fire_count_dayminus1", "fire_count_dayminus2", "fire_count_dayminus3",
+      "fire_frp_dayminus0", "fire_frp_dayminus1", "fire_frp_dayminus2", "fire_frp_dayminus3")
+    )
   toc()
 
   # Attach fire when trajectories are wrong
@@ -95,6 +110,7 @@ test_that("attaching fire - trajectories. Both vector and raster", {
   # A larger one
   mt_large <- lapply(seq(1,20), function(d) mt %>% mutate(date=date - d*(max(date)-min(date)))) %>%
     do.call(bind_rows, .)
+
   tic()
   mtf <- creatrajs::fire.attach_to_trajs(mt_large, buffer_km=buffer_km)
   toc()

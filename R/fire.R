@@ -152,11 +152,13 @@ fire.summary <- function(date, extent, duration_hour, f.sf){
 #'
 #' @param mt
 #' @param duration_hour
+#' @param split_days whether or not to split fires by their "age" (in days) before they reach the city
 #'
 #' @return
 #' @export
 #'
 fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
+                                 split_days=F,
                                  parallel=T,
                                  mc.cores=max(parallel::detectCores()-1,1)){
 
@@ -182,27 +184,32 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
 
   print("Attaching fires (month by month)")
   mtf <- pbmcapply::pbmclapply(base::split(mtf, mtf$date_group),
-         function(mtf){
+         function(mtf_chunk){
            tryCatch({
-             print(unique(mtf$date_group))
-             extent.sp <- sf::as_Spatial(mtf$extent[!sf::st_is_empty(mtf$extent)])
-             f.sf <- fire.read(date_from=min(mtf$date_fire, na.rm=T)-lubridate::days(1),
-                               date_to=max(mtf$date_fire, na.rm=T),
+             print(unique(mtf_chunk$date_group))
+             extent.sp <- sf::as_Spatial(mtf_chunk$extent[!sf::st_is_empty(mtf_chunk$extent)])
+             f.sf <- fire.read(date_from=min(mtf_chunk$date_fire, na.rm=T)-lubridate::days(1),
+                               date_to=max(mtf_chunk$date_fire, na.rm=T),
                                extent.sp=extent.sp,
                                show.progress=F,
                                parallel=F)
 
-             mtf$fires <- mapply(
-               fire.attach_to_trajs_run,
-               date_fire=mtf$date_fire,
-               extent=mtf$extent,
-               f.sf=list(f.sf),
-               delay_hour=delay_hour,
-               SIMPLIFY = F
-             )
-             return(mtf)
+             if(is.null(f.sf)){
+               warning("Didn't find any fire.")
+               mtf_chunk$fires <- list(tibble())
+             }else{
+               mtf_chunk$fires <- mapply(
+                 fire.attach_to_trajs_run,
+                 date_fire=mtf_chunk$date_fire,
+                 extent=mtf_chunk$extent,
+                 f.sf=list(f.sf),
+                 delay_hour=delay_hour,
+                 SIMPLIFY = F
+               )
+             }
+             return(mtf_chunk)
            }, error=function(e){
-             warning("Failed to attach fire to trajectories: ", e, "\n: ", mtf)
+             warning("Failed to attach fire to trajectories: ", e, "\n: ", mtf_chunk)
              return(NULL)
            })
          }, mc.cores = ifelse(parallel, mc.cores,1)) %>%
@@ -210,14 +217,28 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
     do.call(bind_rows,.)
 
   print("Regroup by day (join runs)")
+
+  if(split_days){
+    fire_data <- mtf %>%
+      tidyr::unnest(fires) %>%
+      mutate(age_fire=difftime(as.Date(date), as.Date(date_fire), units="days")) %>%
+      group_by(location_id, date, age_fire) %>%
+      summarise_at(vars(starts_with("fire_")), mean, na.rm=T) %>%
+      tidyr::pivot_wider(c(location_id, date),
+                         names_from=age_fire,
+                         names_prefix="dayminus",
+                         values_from = c("fire_frp", "fire_count"))
+  }else{
+    fire_data <-  mtf %>%
+      tidyr::unnest(fires) %>%
+      group_by(location_id, date) %>%
+      summarise_at(vars(starts_with("fire_")), mean, na.rm=T)
+  }
+
+
   result <- mt %>%
     left_join(
-      mtf %>%
-        tidyr::unnest(fires) %>%
-        group_by(location_id, date) %>%
-        summarise_at(c("fire_frp","fire_count"),
-                     mean,
-                     na.rm=T) %>%
+      fire_data %>%
         group_by(location_id, date) %>%
         tidyr::nest() %>%
         rename(fires=data)
@@ -237,8 +258,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
 #'
 #' @examples
 fire.attach_to_trajs_run <- function(date_fire, extent, f.sf,
-                                     delay_hour=24,
-                                     split_days=F){
+                                     delay_hour=24){
 
   if(nrow(f.sf)==0){
     return(tibble(fire_frp=0, fire_count=0))
