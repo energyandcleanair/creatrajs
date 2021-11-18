@@ -228,11 +228,9 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
 #' @return tibble of fires
 #'
 #' @examples
-fire.attach_to_trajs_run <- function(date_fire, extent, f.sf, delay_hour=24){
-
-  # if(length(unique(trajs_run$run))>1){
-  #   stop("This function should only be called for one trajectory run")
-  # }
+fire.attach_to_trajs_run <- function(date_fire, extent, f.sf,
+                                     delay_hour=24,
+                                     split_days=F){
 
   if(nrow(f.sf)==0){
     return(tibble(fire_frp=0, fire_count=0))
