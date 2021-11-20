@@ -43,7 +43,7 @@ test_that("attaching gfas - trajectories", {
   require(tidyverse)
 
   date_from <- "2018-01-01"
-  date_to <- "2018-01-20"
+  date_to <- "2018-01-03"
   buffer_km <- 50
 
   m <- rcrea::measurements(city="Bangkok",
@@ -76,8 +76,20 @@ test_that("attaching gfas - trajectories", {
 
   # Attach GFAS
   tic()
-  mtf <- creatrajs::gfas.attach_to_trajs(mt, buffer_km=buffer_km)
+  mtf <- creatrajs::gfas.attach_to_trajs(mt, buffer_km=buffer_km, split_days=F)
+  expect_equal(
+    lapply(mtf$fires, names) %>% unlist() %>% unique(),
+    "pm25_emission")
   toc()
+
+  tic()
+  mtf <- creatrajs::gfas.attach_to_trajs(mt, buffer_km=buffer_km, split_days=T)
+  expect_equal(
+    lapply(mtf$fires, names) %>% unlist() %>% unique() %>% sort(),
+    c("pm25_emission_dayminus0", "pm25_emission_dayminus1", "pm25_emission_dayminus2", "pm25_emission_dayminus3"))
+  toc()
+
+
 
   expect_equal(nrow(mt), nrow(mtf))
   expect_true("fires" %in% names(mtf))

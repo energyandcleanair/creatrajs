@@ -147,7 +147,7 @@ gfas.read <- function(date_from=NULL, date_to=NULL, extent.sp=NULL, show.progres
 #' @return
 #' @export
 #'
-gfas.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
+gfas.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24, split_days=F){
 
   if(!all(c("location_id", "date", "trajs") %in% names(mt))){
     stop("wt should  contain the following columns: ",paste("location_id", "date", "trajs"))
@@ -191,13 +191,24 @@ gfas.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24){
     do.call(bind_rows,.)
 
   print("Regroup by day (join runs)")
+  if(split_days){
+    fire_data <- mtf %>%
+      mutate(age_fire=difftime(as.Date(date), as.Date(date_fire), units="days")) %>%
+      group_by(location_id, date, age_fire) %>%
+      summarise_at("pm25_emission", sum, na.rm=T) %>%
+      tidyr::pivot_wider(c(location_id, date),
+                         names_from=age_fire,
+                         names_prefix="pm25_emission_dayminus",
+                         values_from = "pm25_emission")
+  }else{
+    fire_data <-   mtf %>%
+      group_by(location_id, date) %>%
+      summarise_at(c("pm25_emission"), sum, na.rm=T)
+  }
+
   result <- mt %>%
     left_join(
-      mtf %>%
-        group_by(location_id, date) %>%
-        summarise_at(c("pm25_emission"),
-                     sum,
-                     na.rm=T) %>%
+      fire_data %>%
         group_by(location_id, date) %>%
         tidyr::nest() %>%
         rename(fires=data)
