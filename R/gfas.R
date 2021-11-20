@@ -147,7 +147,7 @@ gfas.read <- function(date_from=NULL, date_to=NULL, extent.sp=NULL, show.progres
 #' @return
 #' @export
 #'
-gfas.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24, split_days=F){
+gfas.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24, split_days=F, ...){
 
   if(!all(c("location_id", "date", "trajs") %in% names(mt))){
     stop("wt should  contain the following columns: ",paste("location_id", "date", "trajs"))
