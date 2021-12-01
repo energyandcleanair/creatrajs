@@ -91,7 +91,16 @@ trajs.get <- function(dates,
   }
 
   # Run all of them
-  mapply_ <- if(parallel) function(...){pbmcapply::pbmcmapply(..., mc.cores=mc.cores)} else pbapply::pbmapply
+  mapply_ <- if(parallel){
+    function(...){
+      #pbmcmapply is annoying...
+      #Result structure varies whether there's been a warning or not
+      result <- pbmcapply::pbmcmapply(..., mc.cores=mc.cores)
+      if("value" %in% names(result)) result$value else result
+      }
+    }else{
+      pbapply::pbmapply
+    }
 
   if(is.null(cache_folder)){
     cache_folder <- list(cache_folder)
@@ -99,7 +108,6 @@ trajs.get <- function(dates,
 
   # If parallel, we download met files first to avoid concurrency conflict
   if(parallel){
-
     # But we only download those for trajectories we need to compute
     if(!is.null(cache_folder)){
       files.cache <- file.path(cache_folder,
