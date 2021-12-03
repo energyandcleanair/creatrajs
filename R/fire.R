@@ -122,7 +122,15 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
     })
   }
 
-  lapply_ <- ifelse(show.progress, pbmcapply::pbmclapply, parallel::mclapply)
+  lapply_ <- ifelse(show.progress,
+                    function(...){
+                      #pbmcmapply is annoying...
+                      #Result structure varies whether there's been a warning or not
+                      result <- pbmcapply::pbmcmapply(...)
+                      if("value" %in% names(result)) result$value else result
+                    },
+                    parallel::mclapply)
+
 
   fires <- do.call("bind_rows",
                    lapply_(sort(files[!is.na(files)]), # Sort to read fire_global* first
@@ -183,7 +191,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
   mtf$date_group <- date_group_fn(mtf$date_fire)
 
   print("Attaching fires (month by month)")
-  mtf <- pbmcapply::pbmclapply(base::split(mtf, mtf$date_group),
+  mtf <- parallel::mclapply(base::split(mtf, mtf$date_group),
          function(mtf_chunk){
            tryCatch({
              print(unique(mtf_chunk$date_group))

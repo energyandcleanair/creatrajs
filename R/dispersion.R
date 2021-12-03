@@ -99,7 +99,16 @@ dispersion.get <- function(dates,
   }
 
   # Run all of them
-  mapply_ <- if(parallel) function(...){pbmcapply::pbmcmapply(..., mc.cores=mc.cores)} else pbapply::pbmapply
+  mapply_ <- if(parallel){
+    function(...){
+      #pbmcmapply is annoying...
+      #Result structure varies whether there's been a warning or not
+      result <- pbmcapply::pbmcmapply(..., mc.cores=mc.cores)
+      if("value" %in% names(result)) result$value else result
+    }
+  }else{
+    pbapply::pbmapply
+  }
 
   if(is.null(cache_folder)){
     cache_folder <- list(cache_folder)
