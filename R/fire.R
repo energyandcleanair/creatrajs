@@ -152,6 +152,9 @@ fire.split_archive <- function(file_archive, region="Global"){
                           sprintf("fire_archive_global_%s.txt",
                                   strftime(date, "%Y%j")))
     readr::write_csv(f, file_day)
+
+    #TODO Remove existing files at similar dates
+    # Done manually so far
   })
 }
 
