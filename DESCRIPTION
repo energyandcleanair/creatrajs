@@ -24,7 +24,6 @@ Imports:
     googleCloudStorageR,
     parallel,
     pbapply,
-    pbmcapply,
     pryr,
     ecmwfr,
     exactextractr,
