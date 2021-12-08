@@ -574,6 +574,7 @@ fire.aggregate <- function(date_from, date_to, geometries, fires=NULL){
 
   fires_sp <- as(fires, "Spatial")
   proj4string(fires_sp) <- proj4string(geometries_sp)
+  proj4string(geometries_sp) <- proj4string(fires_sp)
 
   cbind(
     as.data.frame(fires) %>% select(-c(geometry)),
