@@ -27,11 +27,12 @@ Imports:
     pryr,
     ecmwfr,
     exactextractr,
-    here
+    here,
+    splitr
 Depends:
     ggplot2,
     ggmap
 Remotes:
-    hubert-thieriot/splitR
+    hubert-thieriot/splitr
 Suggests: 
     testthat
