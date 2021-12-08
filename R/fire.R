@@ -122,14 +122,7 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
     })
   }
 
-  lapply_ <- ifelse(show.progress,
-                    function(...){
-                      #pbmcmapply is annoying...
-                      #Result structure varies whether there's been a warning or not
-                      result <- pbmcapply::pbmcmapply(...)
-                      if("value" %in% names(result)) result$value else result
-                    },
-                    parallel::mclapply)
+  lapply_ <- parallel::mclapply
 
 
   fires <- do.call("bind_rows",
