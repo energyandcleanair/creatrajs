@@ -122,18 +122,15 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
     })
   }
 
-  lapply_ <- ifelse(show.progress,
-                    function(...){
-                      #pbmcmapply is annoying...
-                      #Result structure varies whether there's been a warning or not
-                      result <- pbmcapply::pbmcmapply(...)
-                      if("value" %in% names(result)) result$value else result
-                    },
-                    parallel::mclapply)
+  lapply_ <- parallel::mclapply
 
+  files_sorted <- sort(files[!is.na(files)]) # Sort to read fire_global* first
+  if(length(files_sorted)==0){
+    return(tibble())
+  }
 
   fires <- do.call("bind_rows",
-                   lapply_(sort(files[!is.na(files)]), # Sort to read fire_global* first
+                   lapply_(files_sorted,
                            read.csv.fire,
                            mc.cores = ifelse(parallel, mc.cores, 1)))
   fires
@@ -568,16 +565,19 @@ fire.attach_to_disps <- function(mt, buffer_km=10, delay_hour=24){
 #' @examples
 fire.aggregate <- function(date_from, date_to, geometries, fires=NULL){
 
-  sp <- creahelpers::to_spdf(geometries)
+  geometries_sp <- creahelpers::to_spdf(geometries)
 
   if(is.null(fires)){
     creatrajs::fire.download(date_from, date_to)
-    fires <- creatrajs::fire.read(date_from=date_from, date_to=date_to, extent.sp = sp)
+    fires <- creatrajs::fire.read(date_from=date_from, date_to=date_to, extent.sp = geometries_sp)
   }
+
+  fires_sp <- as(fires, "Spatial")
+  proj4string(fires_sp) <- proj4string(geometries_sp)
 
   cbind(
     as.data.frame(fires) %>% select(-c(geometry)),
-    sp::over(as(fires, "Spatial"), sp, returnList = F)) %>%
+    sp::over(fires_sp, geometries_sp, returnList = F)) %>%
     rename(date=acq_date) %>%
     group_by_at(setdiff(names(.), "frp")) %>%
     summarise(

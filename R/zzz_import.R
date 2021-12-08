@@ -15,3 +15,8 @@ NULL
 #'
 #' @importFrom sf st_as_sf st_coordinates st_as_sfc st_buffer st_union st_centroid st_bbox st_intersection
 NULL
+
+# ' Pseudo-function to import sp functions
+#'
+#' @importFrom sp proj4string proj4string<- CRS SpatialPointsDataFrame SpatialPolygonsDataFrame
+NULL
