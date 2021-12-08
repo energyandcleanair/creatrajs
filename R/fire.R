@@ -137,6 +137,23 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
 }
 
 
+fire.split_archive <- function(file_archive, region="Global"){
+
+  f <- readr::read_csv(file_archive)
+  fs <- split(f, f$acq_date)
+
+  folder <- file.path(utils.get_firms_folder(),
+                 "suomi-npp-viirs-c2",
+                 region)
+
+  lapply(fs, function(f){
+    date <- unique(f$acq_date)
+    file_day <- file.path(folder,
+                          sprintf("fire_archive_global_%s.txt",
+                                  strftime(date, "%Y%j")))
+    readr::write_csv(f, file_day)
+  })
+}
 
 fire.summary <- function(date, extent, duration_hour, f.sf){
   extent.sf <- sf::st_sfc(extent)
