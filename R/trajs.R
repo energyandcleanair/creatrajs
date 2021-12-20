@@ -123,7 +123,7 @@ trajs.get <- function(dates,
 
     dir_hysplit_met <- Sys.getenv("DIR_HYSPLIT_MET", here::here(utils.get_cache_folder("weather")))
     print(paste("Downloading weather data into", dir_hysplit_met))
-    dir.create(dir_hysplit_met, recursive = T, showWarnings = T)
+    dir.create(dir_hysplit_met, recursive = T, showWarnings = F)
     if(length(missing_dates)){
       splitr::download_met_files(
         met_type = met_type,
