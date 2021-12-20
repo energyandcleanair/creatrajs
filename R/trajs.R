@@ -355,7 +355,7 @@ hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timez
                                  extended_met = F,
                                  met_dir = dir_hysplit_met,
                                  exec_dir = dir_hysplit_output,
-                                 clean_up = T)
+                                 clean_up = F)
 
     # Update fields to be compatible with OpenAIR
     trajs$hour.inc <- trajs$hour_along
