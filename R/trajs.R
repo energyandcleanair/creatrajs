@@ -28,6 +28,8 @@ trajs.get <- function(dates,
                       ...){
 
 
+  # Edge case with India: HYSPLIT doesn't like non-integer hours offset
+  if(timezone=="Asia/Kolkata") timezone <- "Asia/Lahore"
 
   # Row by row
   trajs.get.one <- function(date,
