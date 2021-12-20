@@ -19,6 +19,13 @@ fire.download <- function(date_from=NULL, date_to=NULL, region="Global"){
                  region)
   dir.create(d, showWarnings = F, recursive = T)
 
+  # No date can happen if all trajectories failed
+  # Yet shouldn't stop here
+  if(is.na(date_from) | is.na(date_to)){
+    print("No proper date indicated. Returning NULL")
+    return(NULL)
+  }
+
   date_from <- max(lubridate::date(date_from), lubridate::date("2020-01-01"))
   # Data not available in repository before that
   # Have been downloaded manually prior 2020
@@ -217,8 +224,6 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
     filter(!is.na(date_fire))
   print("Done")
 
-  date_from=min(mtf$date_fire, na.rm=T)
-  date_to=max(mtf$date_fire, na.rm=T)
   print(sprintf("Downloading fires from %s to %s", date_from, date_to))
   fire.download(date_from=date_from,
                 date_to=date_to)
