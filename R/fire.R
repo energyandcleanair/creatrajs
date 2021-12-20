@@ -1,3 +1,7 @@
+fire.filename_to_date <- function(f){
+  as.POSIXct(gsub(".*([0-9]{7})\\.(txt|csv)","\\1", f), format="%Y%j")
+}
+
 
 #' Download active fire data into local folder
 #'
@@ -31,7 +35,11 @@ fire.download <- function(date_from=NULL, date_to=NULL, region="Global"){
     # Even though wget can manage already downloaded files,
     # this is faster and less verbose in console
     files.existing <- list.files(d, "*.txt")
-    file.todownload <- setdiff(files.all, files.existing)
+    date.existing <- fire.filename_to_date(files.existing)
+
+    date.all <- fire.filename_to_date(files.all)
+
+    file.todownload <- files.all[which(!date.all %in% date.existing)]
 
     # To generate EOSDIS Token: https://nrt3.modaps.eosdis.nasa.gov/profile/app-keys
     eosdis_token <- Sys.getenv("EOSDIS_TOKEN")
@@ -72,7 +80,7 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
 
   f_min_date <- function(f, date_from, date_to){
     # ifelse(
-    as.POSIXct(gsub(".*([0-9]{7})\\.(txt|csv)","\\1", f), format="%Y%j")
+    fire.filename_to_date(f)
     # Yearly files have been manually spread into smaller daily ones
     # as.POSIXct(gsub(".*([0-9]{4})\\.(txt|csv)","\\1-01-01", f), format="%Y-%m-%d")
     # )
@@ -81,7 +89,7 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
   f_max_date <- function(f, date_from, date_to){
     # ifelse(
     # stringr::str_detect(f, "[0-9]{7}"),
-    as.POSIXct(gsub(".*([0-9]{7})\\.(txt|csv)","\\1", f), format="%Y%j")
+    fire.filename_to_date(f)
     # Yearly files have been manually spread into smaller daily ones
     # as.POSIXct(gsub(".*([0-9]{4})\\.(txt|csv)","\\1-12-31", f), format="%Y-%m-%d")
     # )
@@ -94,6 +102,12 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
     warning("No file found for the corresponding dates")
     return(NULL)
   }
+
+  # Only one file per date
+  dates <- fire.filename_to_date(files)
+  files <- tibble::tibble(files, dates) %>%
+    dplyr::distinct(dates, .keep_all = T) %>%
+    dplyr::pull(files)
 
   read.csv.fire <-function(f){
     tryCatch({
@@ -136,6 +150,32 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
   fires
 }
 
+
+fire.split_archive <- function(file_archive, region="Global"){
+
+  f <- readr::read_csv(file_archive)
+  fs <- split(f, f$acq_date)
+
+  folder <- file.path(utils.get_firms_folder(),
+                 "suomi-npp-viirs-c2",
+                 region)
+
+  lapply(fs, function(f){
+    date <- unique(f$acq_date)
+    file_day <- file.path(folder,
+                          sprintf("fire_archive_global_%s.txt",
+                                  strftime(date, "%Y%j")))
+
+    # Remove existing file at that date
+    existing_files <- list.files(path=folder,
+                                 pattern=sprintf("%s.[txt|csv]", strftime(date, "%Y%j")),
+                                 full.names = T)
+    lapply(existing_files, file.remove)
+
+    # Export
+    readr::write_csv(f, file_day)
+  })
+}
 
 
 fire.summary <- function(date, extent, duration_hour, f.sf){
@@ -574,6 +614,7 @@ fire.aggregate <- function(date_from, date_to, geometries, fires=NULL){
 
   fires_sp <- as(fires, "Spatial")
   proj4string(fires_sp) <- proj4string(geometries_sp)
+  proj4string(geometries_sp) <- proj4string(fires_sp)
 
   cbind(
     as.data.frame(fires) %>% select(-c(geometry)),
