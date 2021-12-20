@@ -4,11 +4,11 @@ test_that("building trajectories work", {
   require(rcrea)
   require(testthat)
 
-  m <- rcrea::measurements(city="Lahore",
+  m <- rcrea::measurements(city="Bangkok",
                            poll="pm25",
-                           source="openaq_government",
-                           date_from = "2020-01-01",
-                           date_to = "2020-01-01",
+                           source="air4thai",
+                           date_from = "2020-06-01",
+                           date_to = "2020-06-01",
                            process_id="city_day_mad",
                            with_geometry=T
                            )
@@ -16,22 +16,40 @@ test_that("building trajectories work", {
   expect_equal(nrow(m), 1)
 
   # Without cache
-  date <- "2020-01-05"
+  date <- "2020-06-01"
   t <- creatrajs::trajs.get(dates=date,
                  geometry = m$geometry,
                  location_id = m$location_id,
-                 country = m$country,
                  met_type = "gdas1",
-                 heights = 500,
-                 duration_hour = 72,
+                 heights = 10,
+                 duration_hour = 120,
                  cache_folder = NULL
                  )
   expect_false(is.na(t))
   expect_true(all(
-    c("traj_dt","traj_dt_i","lat","lon","height","date") %in% names(t)
+    c("traj_dt","traj_dt_i","lat","lon","height","date_recept") %in% names(t[[1]])
   ))
 
-  expect_equal(unique(lubridate::date(t$traj_dt_i)), lubridate::date(date))
+  expect_equal(unique(lubridate::date(t[[1]]$traj_dt_i)), lubridate::date(date))
+
+
+  # With cache
+  date <- "2020-06-01"
+  cache_folder <- tempdir(check=T)
+  t <- creatrajs::trajs.get(dates=date,
+                            geometry = m$geometry,
+                            location_id = m$location_id,
+                            met_type = "gdas1",
+                            heights = 10,
+                            duration_hour = 120,
+                            cache_folder = cache_folder
+  )
+  f <- list.files(cache_folder, "bangkok.*gdas.*RDS", full.names = T)
+  expect_equal(length(f), 1)
+  expect_equal(nrow(t[[1]]), nrow(readRDS(f)))
+
+  # Should test it actually uses cache
+  # TODO
 })
 
 
