@@ -217,9 +217,11 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
     filter(!is.na(date_fire))
   print("Done")
 
-  print("Downloading fires")
-  fire.download(date_from=min(mtf$date_fire, na.rm=T),
-                date_to=max(mtf$date_fire, na.rm=T))
+  date_from=min(mtf$date_fire, na.rm=T)
+  date_to=max(mtf$date_fire, na.rm=T)
+  print(sprintf("Downloading fires from %s to %s", date_from, date_to))
+  fire.download(date_from=date_from,
+                date_to=date_to)
   print("Done")
 
   # Read and only keep fires within extent to save memory
