@@ -21,7 +21,7 @@ fire.download <- function(date_from=NULL, date_to=NULL, region="Global"){
 
   # No date can happen if all trajectories failed
   # Yet shouldn't stop here
-  if(is.na(date_from) | is.na(date_to)){
+  if(is.infinite(date_from) | is.infinite(date_to)){
     print("No proper date indicated. Returning NULL")
     return(NULL)
   }
