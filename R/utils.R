@@ -6,8 +6,6 @@ utils.check_environment <- function(){
 
   vars <- c(
     "DIR_DATA",
-    "DIR_HYSPLIT_MET",
-    "DIR_FIRMS",
     "GOOGLE_MAP_API_KEY")
 
   print("Checking Environment")

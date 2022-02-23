@@ -14,7 +14,7 @@ utils.get_dir_data <- function(){
     dir_data = getwd()
   }
   return(dir_data)
-}
+}z
 
 
 #' Cache folder
@@ -84,6 +84,6 @@ utils.get_gfas_folder <- function(){
     stop("DIR_DATA environment variable not defined")
   }
 
-  return(file.path(d, "gfas"))
+  return(file.path(d, "fire", "gfas"))
 }
 
