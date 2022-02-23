@@ -16,13 +16,13 @@ test_that("building trajectories work", {
 
   # Without cache
   t <- creatrajs::trajs.get(dates=date,
-                 geometry = l$geometry,
-                 location_id = l$location_id,
-                 met_type = met_type,
-                 heights = height,
-                 duration_hour = duration_hour,
-                 cache_folder = NULL
-                 )
+                            geometry = l$geometry,
+                            location_id = l$id,
+                            met_type = met_type,
+                            height = height,
+                            duration_hour = duration_hour,
+                            use_cache=F,
+                            save_to_cache=F)
 
   trajs <- t[[1]]
   existing <- db.find_trajs(location_id=location_id)
@@ -69,4 +69,14 @@ test_that("building trajectories work", {
   expect_equal(
     sort(unique(downloaded$duration_hour)),
     c(duration_hour, duration_hour+1))
+
+  # Insensitive to date format
+  downloaded <- db.download_trajs(location_id,
+                                  met_type=met_type,
+                                  height=height,
+                                  date=as.Date(date, tz="UTC+10"))
+  expect_true(nrow(downloaded)==2)
+
+
+
 })

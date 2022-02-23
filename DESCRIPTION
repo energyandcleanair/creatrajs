@@ -28,7 +28,8 @@ Imports:
     ecmwfr,
     exactextractr,
     here,
-    splitr
+    splitr,
+    mongolite
 Depends:
     ggplot2,
     ggmap

@@ -70,7 +70,7 @@ test_that("attaching gfas - trajectories", {
                                   heights = 500,
                                   duration_hour = 72,
                                   hours = seq(0,23),
-                                  cache_folder = utils.get_cache_folder("trajs")
+                                  use_cache=F
              )
     )
 

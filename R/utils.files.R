@@ -14,7 +14,7 @@ utils.get_dir_data <- function(){
     dir_data = getwd()
   }
   return(dir_data)
-}z
+}
 
 
 #' Cache folder

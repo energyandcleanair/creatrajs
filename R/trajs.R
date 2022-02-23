@@ -4,7 +4,7 @@
 #' @param location_id
 #' @param geometry
 #' @param met_type
-#' @param heights
+#' @param height
 #' @param duration_hour
 #' @param ...
 #'
@@ -16,12 +16,12 @@ trajs.get <- function(dates,
                       location_id,
                       geometry,
                       met_type,
-                      heights,
+                      height,
                       duration_hour,
                       hours=c(0,6,12,18),
                       timezone="UTC",
-                      use_cache=T, # If False, will not read cache BUT will try to write in it
-                      cache_folder=NULL,
+                      use_cache=T, # If False, will not read cache BUT will try to write in it if upload_to_cache
+                      save_to_cache=use_cache,
                       parallel=F,
                       mc.cores=max(parallel::detectCores()-1,1),
                       debug=T,
@@ -40,52 +40,58 @@ trajs.get <- function(dates,
                             duration_hour,
                             timezone,
                             hours,
-                            cache_folder,
+                            use_cache,
+                            save_to_cache,
                             debug){
     tryCatch({
 
-      file.cache <- file.path(
-        cache_folder,
-        trajs.cache_filename(location_id, met_type, height, duration_hour, date))
+      if(use_cache){
+        found <- db.download_trajs(location_id=location_id,
+                                   met_type=met_type,
+                                   date=date,
+                                   height=height,
+                                   duration_hour)
 
-      if(!is.null(cache_folder) &&
-         use_cache &&
-         file.exists(file.cache) &&
-         file.info(file.cache)$size > 600){
-        # Cache version exists and has data
-        t <- readRDS(file.cache)
-
-        #backward compatibility:
-        if("date" %in% names(t)){
-          t <- t %>% rename(date_recept=date)
+        if(!is.null(found) && nrow(found)==1){
+          t <- found$trajs[[1]]
+          if("date" %in% names(t)){
+            t <- t %>% rename(date_recept=date)
+          }
+          return(t)
         }
-        return(t)
-      }else{
-        # Compute trajs
-        t <- hysplit.trajs(date=date,
-                           geometry=geometry,
-                           met_type=met_type,
-                           duration_hour=duration_hour,
-                           height=height,
-                           timezone=timezone,
-                           hours=hours
-        )
+      }
 
-        if(length(t)==0 || (length(t)==1 && is.na(t))){
-          return(NA)
-        }
+      # Compute trajs
+      t <- hysplit.trajs(date=date,
+                         geometry=geometry,
+                         met_type=met_type,
+                         duration_hour=duration_hour,
+                         height=height,
+                         timezone=timezone,
+                         hours=hours
+      )
 
-        # Save to cache
-        if(!is.null(cache_folder)){
-          saveRDS(t,file.cache)
-        }
+      if(length(t)==0 || (length(t)==1 && is.na(t))){
+        return(NA)
+      }
 
-        if(debug){
-          message("Memory used: ", round(pryr::mem_used()/1E6),"MB")
-        }
+      # Save to cache
+      if(save_to_cache){
+        db.upload_trajs(trajs=t,
+                        location_id=location_id,
+                        met_type=met_type,
+                        date=date,
+                        duration_hour=duration_hour,
+                        height=height
+                        )
+      }
 
-        return(t)
-      }}, error=function(c){
+      if(debug){
+        message("Memory used: ", round(pryr::mem_used()/1E6),"MB")
+      }
+
+      return(t)
+      }, error=function(c){
         print(c)
         warning(paste("Failed to calculate trajs:", c))
         return(NA)
@@ -104,23 +110,19 @@ trajs.get <- function(dates,
       pbapply::pbmapply
     }
 
-  if(is.null(cache_folder)){
-    cache_folder <- list(cache_folder)
-  }
-
   # If parallel, we download met files first to avoid concurrency conflict
   if(parallel){
-    # But we only download those for trajectories we need to compute
-    if(!is.null(cache_folder)){
-      files.cache <- file.path(cache_folder,
-        trajs.cache_filename(location_id, met_type, heights, duration_hour, dates))
-
-      missing_dates <- dates[!file.exists(files.cache)]
+    if(use_cache){
+      available_dates <- db.available_dates(location_id=location_id,
+                                            met_type=met_type,
+                                            duration_hour=duration_hour,
+                                            height=height)
+      missing_dates <- setdiff(missing_dates, available_dates)
     }else{
       missing_dates <- dates
     }
 
-
+    # Weather data
     dir_hysplit_met <- Sys.getenv("DIR_HYSPLIT_MET", here::here(utils.get_cache_folder("weather")))
     print(paste("Downloading weather data into", dir_hysplit_met))
     dir.create(dir_hysplit_met, recursive = T, showWarnings = F)
@@ -142,10 +144,11 @@ trajs.get <- function(dates,
     location_id=location_id,
     geometry=geometry,
     met_type=met_type,
-    height=heights,
+    height=height,
     duration_hour=duration_hour,
     timezone=timezone,
-    cache_folder=cache_folder,
+    use_cache=use_cache,
+    save_to_cache=save_to_cache,
     hours=list(hours),
     debug=debug,
     SIMPLIFY=F)

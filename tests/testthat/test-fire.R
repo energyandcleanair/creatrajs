@@ -77,7 +77,6 @@ test_that("attaching fire - trajectories. Both vector and raster", {
                             heights = 500,
                             duration_hour = 72,
                             hours = c(0,3,6), #seq(0,23)
-                            # cache_folder = utils.get_cache_folder("trajs")
                            )
       )
 
@@ -190,15 +189,3 @@ test_that("attaching fire - circular", {
   expect_gt(mtf$fires[[1]]$fire_count, 0)
   expect_gt(mtf$fires[[1]]$fire_frp, 0)
 })
-
-
-test_that("summarising fires", {
-
-  library(creahelpers)
-
-  g <- creahelpers::get_adm(level=1, iso2s="IN")
-  date_from <- "2021-11-01"
-  date_to <- "2021-11-03"
-
-
-

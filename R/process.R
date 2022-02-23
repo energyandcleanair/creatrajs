@@ -86,7 +86,7 @@ process <- function(city,
                    geometry=mf$geometry,
                    met_type=met_type,
                    duration_hour=duration_hour,
-                   heights=height)
+                   height=height)
 
   # Only keep days with trajectories
   mf <- mf %>%

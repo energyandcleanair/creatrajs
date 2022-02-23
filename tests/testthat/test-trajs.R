@@ -4,52 +4,48 @@ test_that("building trajectories work", {
   require(rcrea)
   require(testthat)
 
-  m <- rcrea::measurements(city="Bangkok",
-                           poll="pm25",
-                           source="air4thai",
-                           date_from = "2020-06-01",
-                           date_to = "2020-06-01",
-                           process_id="city_day_mad",
-                           with_geometry=T
-                           )
+  l <- rcrea::cities(name="Bangkok", with_geometry=T)
 
-  expect_equal(nrow(m), 1)
+  get_trajs <- function(use_cache){
+    dates <- seq.Date(as.Date("2020-06-01"), as.Date("2020-06-10"), by="day")
+    creatrajs::trajs.get(dates=dates,
+                              geometry = l$geometry,
+                              location_id = l$id,
+                              met_type = "gdas1",
+                              height = 10,
+                              duration_hour = 120,
+                              use_cache=use_cache,
+                              save_to_cache=T
+    )
+  }
 
   # Without cache
-  date <- "2020-06-01"
-  t <- creatrajs::trajs.get(dates=date,
-                 geometry = m$geometry,
-                 location_id = m$location_id,
-                 met_type = "gdas1",
-                 heights = 10,
-                 duration_hour = 120,
-                 cache_folder = NULL
-                 )
-  expect_false(is.na(t))
+  start_time <- Sys.time()
+  t <- get_trajs(use_cache=F)
+  end_time <- Sys.time()
+  elapsed <- end_time - start_time
+
+  expect_false(any(is.na(t) || is.null(t)))
   expect_true(all(
     c("traj_dt","traj_dt_i","lat","lon","height","date_recept") %in% names(t[[1]])
   ))
-
   expect_equal(unique(lubridate::date(t[[1]]$traj_dt_i)), lubridate::date(date))
 
 
   # With cache
-  date <- "2020-06-01"
-  cache_folder <- tempdir(check=T)
-  t <- creatrajs::trajs.get(dates=date,
-                            geometry = m$geometry,
-                            location_id = m$location_id,
-                            met_type = "gdas1",
-                            heights = 10,
-                            duration_hour = 120,
-                            cache_folder = cache_folder
-  )
-  f <- list.files(cache_folder, "bangkok.*gdas.*RDS", full.names = T)
-  expect_equal(length(f), 1)
-  expect_equal(nrow(t[[1]]), nrow(readRDS(f)))
+  start_time <- Sys.time()
+  t_cache <- get_trajs(use_cache=T)
+  end_time <- Sys.time()
+  elapsed_cache <- end_time - start_time
 
-  # Should test it actually uses cache
-  # TODO
+  expect_true(elapsed_cache < elapsed / 10)
+  expect_equal(length(t_cache), length(t))
+  expect_false(any(is.na(t_cache)) | any(sapply(t_cache, is.null)))
+
+  expect_true(all(sapply(seq(length(t)), function(i){
+    all(t[[i]]==t_cache[[i]])
+  })))
+
 })
 
 
@@ -81,7 +77,7 @@ test_that("parallel works", {
                                            met_type = "gdas1",
                                            heights = 500,
                                            duration_hour = 72,
-                                           cache_folder = NULL,
+                                           use_cache=F,
                                            parallel=F
   )
   t.duration.noparallel <- Sys.time() - start
@@ -96,7 +92,7 @@ test_that("parallel works", {
                        met_type = "gdas1",
                        heights = 500,
                        duration_hour = 72,
-                       cache_folder = NULL,
+                       use_cache=F,
                        parallel=T
   )
   t.duration.parallel <- Sys.time() - start
@@ -145,7 +141,7 @@ test_that("vectorization works", {
                                  met_type = "gdas1",
                                  heights = 500,
                                  duration_hour = 72,
-                                 cache_folder = NULL,
+                                 use_cache=F,
                                  parallel=F
   )
 
@@ -164,14 +160,6 @@ test_that("trajectories cache system works", {
   require(rcrea)
   require(testthat)
 
-  m <- rcrea::measurements(city="Delhi",
-                           poll="pm25",
-                           source="cpcb",
-                           date_from = "2020-01-01",
-                           date_to = "2020-01-05",
-                           process_id="city_day_mad",
-                           with_geometry=T
-  )
 
 
   # Run first time
@@ -182,7 +170,8 @@ test_that("trajectories cache system works", {
                        met_type = "gdas1",
                        heights = 500,
                        duration_hour = 72,
-                       cache_folder = utils.get_cache_folder(),
+                       use_cache=F,
+                       save_to_cache=F,
                        parallel=T
   )
 
@@ -195,7 +184,7 @@ test_that("trajectories cache system works", {
                                   met_type = "gdas1",
                                   heights = 500,
                                   duration_hour = 72,
-                                  cache_folder = utils.get_cache_folder("trajs"),
+                                  use_cache=T,
                                   parallel=T
   )
   t.duration <- Sys.time() - start
