@@ -117,7 +117,8 @@ trajs.get <- function(dates,
                                             met_type=met_type,
                                             duration_hour=duration_hour,
                                             height=height)
-      missing_dates <- setdiff(missing_dates, available_dates)
+      print(sprintf("Found %d available in cache", length(available_dates)))
+      missing_dates <- as.Date(setdiff(dates, lubridate::as_date(available_dates)), origin="1970-01-01")
     }else{
       missing_dates <- dates
     }

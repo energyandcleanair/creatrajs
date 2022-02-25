@@ -59,24 +59,17 @@ test_that("parallel works", {
   date_to = "2020-01-10"
   dates = seq.Date(as.Date(date_from), as.Date(date_to), by="day")
 
-  m <- rcrea::measurements(city="Delhi",
-                           poll="pm25",
-                           source="cpcb",
-                           date_from = date_from,
-                           date_to = date_to,
-                           process_id="city_day_mad",
-                           with_geometry=T
-  )
+  l <- rcrea::cities(name="Kuala Lumpur", with_geometry=T)
+
 
   # Run no parallel
   start <- Sys.time()
   trajs.noparallel <- creatrajs::trajs.get(dates=dates,
-                                           geometry = m$geometry,
-                                           location_id = m$location_id,
-                                           country = m$country,
+                                           geometry = l$geometry,
+                                           location_id = l$id,
                                            met_type = "gdas1",
-                                           heights = 500,
-                                           duration_hour = 72,
+                                           height = 10,
+                                           duration_hour = 120,
                                            use_cache=F,
                                            parallel=F
   )
@@ -85,15 +78,14 @@ test_that("parallel works", {
 
   # Run parallel
   start <- Sys.time()
-  trajs.parallel <- creatrajs::trajs.get(dates=seq.Date(as.Date(date_from),as.Date(date_to),by="day"),
-                       geometry = m$geometry,
-                       location_id = m$location_id,
-                       country = m$country,
-                       met_type = "gdas1",
-                       heights = 500,
-                       duration_hour = 72,
-                       use_cache=F,
-                       parallel=T
+  trajs.noparallel <- creatrajs::trajs.get(dates=dates,
+                                           geometry = l$geometry,
+                                           location_id = l$id,
+                                           met_type = "gdas1",
+                                           height = 10,
+                                           duration_hour = 120,
+                                           use_cache=T,
+                                           parallel=T
   )
   t.duration.parallel <- Sys.time() - start
   expect_equal(length(trajs.parallel), length(dates))
