@@ -24,7 +24,7 @@ trajs.get <- function(dates,
                       save_to_cache=use_cache,
                       parallel=F,
                       mc.cores=max(parallel::detectCores()-1,1),
-                      debug=T,
+                      debug=F,
                       ...){
 
 
@@ -113,12 +113,22 @@ trajs.get <- function(dates,
   # If parallel, we download met files first to avoid concurrency conflict
   if(parallel){
     if(use_cache){
-      available_dates <- db.available_dates(location_id=location_id,
-                                            met_type=met_type,
-                                            duration_hour=duration_hour,
-                                            height=height)
-      print(sprintf("Found %d available in cache", length(available_dates)))
-      missing_dates <- as.Date(setdiff(dates, lubridate::as_date(available_dates)), origin="1970-01-01")
+      available <- tibble(location_id=location_id, date=dates, height=height)
+      available_l <- split(available, paste(available$location_id, available$height, sep="_"))
+      available <- lapply(available_l, function(l){
+        available_dates_height <- db.available_dates(location_id=unique(location_id),
+                           met_type=met_type,
+                           duration_hour=duration_hour,
+                           height=unique(l$height))
+        l %>% rowwise() %>% mutate(is.available=date %in% available_dates_height)
+      }) %>% do.call(bind_rows, .)
+
+
+      available_dates <- available %>% filter(is.available) %>% pull(date)
+      missing_dates <- available %>% filter(!is.available) %>% pull(date)
+      print(sprintf("Found %d available in cache. %d still missing",
+                    length(available_dates),
+                    length(missing_dates)))
     }else{
       missing_dates <- dates
     }
