@@ -172,8 +172,10 @@ test_that("attaching fire with split_regions", {
   library(tictoc)
   library(tidyverse)
 
-  date_from  <- "2020-01-05"
-  date_to  <- "2020-01-10"
+  # Should be recent enough to have fire
+  # old enough to have weather
+  date_from  <- lubridate::today() - lubridate::days(40)
+  date_to  <- lubridate::today() - lubridate::days(40)
   dates <- seq(as.Date(date_from), as.Date(date_to), by="day")
   buffer_km <- 50
 
@@ -192,82 +194,35 @@ test_that("attaching fire with split_regions", {
                                 met_type = "gdas1",
                                 height = 10,
                                 duration_hour = 120,
-                                hours = c(0,3,6)) #seq(0,23)
+                                hours = c(6)) #seq(0,23)
 
-  # Attach fire: vector method
-  tic()
-  mtf <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=F, split_regions="gadm_0")
-  expect_equal(
-    lapply(mtf$fires, names) %>% unlist() %>% unique() %>% sort(),
-    c("fire_count", "fire_frp"))
-  names(mtf$fires[[1]])
+  mt = tibble(location_id=l$id,
+              date=dates,
+              trajs=trajs)
 
+  # Attach fire
+  mtf_0 <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=F, split_regions="gadm_0")
+  mtf_1 <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=F, split_regions="gadm_1")
+  mtf_2 <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=F, split_regions="gadm_2")
 
-  toc()
+  fire_comparison <- bind_rows(
+    mtf_0 %>% mutate(level='0'),
+    mtf_1 %>% mutate(level='1'),
+    mtf_2 %>% mutate(level='2')) %>%
+  tidyr::unnest(fires) %>%
+    select_if(grepl("date|level|fire_.*", names(.))) %>%
+    tidyr::pivot_longer(cols=-c(level, date)) %>%
+    mutate(name=stringr::str_extract(name, '(fire_[^\\_]*)')) %>%
+    group_by(date, level, name) %>%
+    summarise(value=sum(value, na.rm=T)) %>%
+    pivot_wider(names_from=level, values_from=value, names_prefix='value_')
 
-  tic()
-  mtf <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=T)
-  expect_equal(
-    lapply(mtf$fires, names) %>% unlist() %>% unique() %>% sort(),
-    c("fire_count_dayminus0", "fire_count_dayminus1", "fire_count_dayminus2", "fire_count_dayminus3",
-      "fire_frp_dayminus0", "fire_frp_dayminus1", "fire_frp_dayminus2", "fire_frp_dayminus3")
-  )
-  toc()
+  expect_equal(fire_comparison$value_0, fire_comparison$value_1)
+  expect_equal(fire_comparison$value_0, fire_comparison$value_2)
 
-  # Attach fire when trajectories are wrong
-  tic()
-  mt_onetraj <- mt %>% rowwise() %>% mutate(trajs=list(head(trajs, 1)))
-  mtf_onetraj <- creatrajs::fire.attach_to_trajs(mt_onetraj, buffer_km=buffer_km)
-  toc()
-
-  # A larger one
-  mt_large <- lapply(seq(1,20), function(d) mt %>% mutate(date=date - d*(max(date)-min(date)))) %>%
-    do.call(bind_rows, .)
-
-  tic()
-  mtf <- creatrajs::fire.attach_to_trajs(mt_large, buffer_km=buffer_km)
-  toc()
-
-
-  expect_equal(nrow(mt), nrow(mtf))
-  expect_true("fires" %in% names(mtf))
-  expect_gt(mtf$fires[[1]]$fire_count, 0)
-  expect_gt(mtf$fires[[1]]$fire_frp, 0)
-
-
-
-  # Attach fire: raster stack method
-  tic()
-  rs <- mt %>%
-    rowwise() %>%
-    mutate(trajs_rs=list(creatrajs::trajs.to_rasterstack(trajs, buffer_km=buffer_km, res_deg=0.1)))
-  toc()
-  tic()
-  rsf <- creatrajs::fire.attach_to_trajs_rs(rs)
-  toc()
-
-
-
-  # Visual confirmation
-  i=2
-  ti.sf <- mtf$trajs[[i]] %>% sf::st_as_sf(coords=c("lon","lat"))
-  ggplot(ti.sf) + geom_sf(aes(color=lubridate::date(traj_dt))) + facet_wrap(~run, ncol=3)
-  raster::plot(rs$trajs_rs[[i]], ext=sf::st_bbox(ti.sf))
-  raster::plot(subset(rs$trajs_rs[[i]],1), ext=sf::st_bbox(ti.sf))
-  raster::plot(subset(rs$trajs_rs[[i]],2), ext=sf::st_bbox(ti.sf), add=T)
-  raster::plot(subset(rs$trajs_rs[[i]],3), ext=sf::st_bbox(ti.sf), add=T)
-  raster::plot(subset(rs$trajs_rs[[i]],4), ext=sf::st_bbox(ti.sf), add=T)
-  raster::plot(as(ti.sf, "Spatial"), add=T)
-
-
-  bind_rows(
-    mtf %>% tidyr::unnest(fires) %>% mutate(version="vector"),
-    rsf %>% tidyr::unnest(fires) %>% mutate(version="raster")
-  ) %>%
-    ggplot() +
-    geom_bar(aes(date, fire_count, fill=version),
-             stat="identity",
-             position="dodge")
+  ggplot(fire_comparison) +
+    geom_line(aes(date, value, col=level)) +
+    facet_wrap(~name + level)
 
 
 })

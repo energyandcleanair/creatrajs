@@ -290,7 +290,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
       tidyr::unnest(fires) %>%
       mutate(age_fire=difftime(as.Date(date), as.Date(date_fire), units="days")) %>%
       group_by(location_id, date, age_fire) %>%
-      summarise_at(vars(starts_with("fire_")), mean, na.rm=T) %>%
+      summarise_at(vars(starts_with("fire_")), sum, na.rm=T) %>%
       tidyr::pivot_wider(c(location_id, date),
                          names_from=age_fire,
                          names_prefix="dayminus",
@@ -299,7 +299,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
     fire_data <-  mtf %>%
       tidyr::unnest(fires) %>%
       group_by(location_id, date) %>%
-      summarise_at(vars(starts_with("fire_")), mean, na.rm=T)
+      summarise_at(vars(starts_with("fire_")), sum, na.rm=T)
   }
 
 
