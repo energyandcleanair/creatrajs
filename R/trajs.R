@@ -140,7 +140,7 @@ trajs.get <- function(dates,
     if(length(missing_dates)){
       splitr::download_met_files(
         met_type = met_type,
-        days = as.Date(missing_dates),
+        days = as.Date(missing_dates) %>% sort(),
         duration = duration_hour,
         direction = "backward",
         met_dir = dir_hysplit_met
