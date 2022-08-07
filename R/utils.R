@@ -268,3 +268,12 @@ utils.convert_to_openair <- function(trajs){
   trajs$day <- lubridate::date(trajs$traj_dt_i)
   return(trajs)
 }
+
+
+utils.lapply_fn <- function(parallel, mc.cores){
+  if(parallel){
+    return(function(...){parallel::mclapply(..., mc.cores=mc.cores)})
+  }else{
+    return(lapply)
+  }
+}

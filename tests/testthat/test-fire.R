@@ -3,11 +3,14 @@ test_that("getting fire works", {
   require(rcrea)
   require(testthat)
 
-  creatrajs::fire.download(date_from="2020-05-05", date_to="2020-05-10")
+  date_from <- lubridate::today() - 10
+  date_to <- lubridate::today() - 5
+
+  creatrajs::fire.download(date_from=date_from, date_to=date_to)
 
   f <- creatrajs::fire.read(
-    date_from="2020-05-05",
-    date_to="2020-05-10",
+    date_from=date_from,
+    date_to=date_to,
     region="Global",
     extent.sp=NULL)
 
@@ -18,8 +21,8 @@ test_that("getting fire works", {
 
   # Getting Delhi region box
   m <- rcrea::measurements(city="Delhi",country="IN",
-                           date_from="2020-01-05",
-                           date_to="2020-01-05",
+                           date_from=date_from,
+                           date_to=date_to,
                            poll="pm25",
                            with_geometry = T)
 
@@ -27,8 +30,8 @@ test_that("getting fire works", {
     sf::st_buffer(1) %>%
     as("Spatial")
 
-  f.delhi <- creatrajs::fire.read(date_from="2020-05-05",
-                                 date_to="2020-05-10",
+  f.delhi <- creatrajs::fire.read(date_from=date_from,
+                                 date_to=date_to,
                                  region="Global",
                                  extent.sp=extent.sp)
 
@@ -45,10 +48,13 @@ test_that("attaching fire - trajectories. Both vector and raster", {
   library(tictoc)
   library(tidyverse)
 
-  date_from  <- "2020-01-05"
-  date_to  <- "2020-01-10"
-  buffer_km <- 10
+  date_from <- lubridate::today() - 10
+  date_to <- lubridate::today() - 5
 
+  dates <- seq(as.Date(date_from), as.Date(date_to), by="day")
+  buffer_km <- 50
+
+  l <- rcrea::locations(city="Delhi", with_geometry=T)
   m <- rcrea::measurements(city="Delhi",
                            poll="pm25",
                            source="cpcb",
@@ -59,26 +65,26 @@ test_that("attaching fire - trajectories. Both vector and raster", {
   )
 
   creatrajs::fire.download(
-    date_from=as.Date(date_from)-1,
+    date_from=date_from,
     date_to=date_to,
     region="Global")
 
   expect_equal(nrow(m),
-               as.numeric(as.Date(date_to)-as.Date(date_from)+1, unit="days"))
+               as.numeric(date_to-date_from, unit="days")+1)
+
 
   # Get trajectories
   mt <- m %>%
     rowwise() %>%
-    mutate(trajs=
-      creatrajs::trajs.get(dates=date,
-                            geometry = geometry,
-                            location_id = location_id,
+    mutate(trajs=creatrajs::trajs.get(dates=date,
+                            geometry = unique(m$geometry),
+                            location_id = unique(m$location_id),
                             met_type = "gdas1",
-                            heights = 500,
-                            duration_hour = 72,
+                            height = 10,
+                            duration_hour = 120,
                             hours = c(0,3,6), #seq(0,23)
-                           )
-      )
+                           ))
+
 
   # Attach fire: vector method
   tic()
@@ -154,6 +160,69 @@ test_that("attaching fire - trajectories. Both vector and raster", {
     geom_bar(aes(date, fire_count, fill=version),
              stat="identity",
              position="dodge")
+
+
+})
+
+
+test_that("attaching fire with split_regions", {
+
+  library(rcrea)
+  library(testthat)
+  library(tictoc)
+  library(tidyverse)
+
+  # Should be recent enough to have fire
+  # old enough to have weather
+  date_from  <- lubridate::today() - lubridate::days(40)
+  date_to  <- lubridate::today() - lubridate::days(40)
+  dates <- seq(as.Date(date_from), as.Date(date_to), by="day")
+  buffer_km <- 50
+
+  l <- rcrea::locations(city="Delhi", with_geometry=T)
+
+  creatrajs::fire.download(
+    date_from=as.Date(date_from)-1,
+    date_to=date_to,
+    region="Global")
+
+
+  # Get trajectories
+  trajs <- creatrajs::trajs.get(dates=dates,
+                                geometry = l$geometry,
+                                location_id = l$id,
+                                met_type = "gdas1",
+                                height = 10,
+                                duration_hour = 120,
+                                hours = c(6)) #seq(0,23)
+
+  mt = tibble(location_id=l$id,
+              date=dates,
+              trajs=trajs)
+
+  # Attach fire
+  mtf_0 <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=F, split_regions="gadm_0")
+  mtf_1 <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=F, split_regions="gadm_1")
+  mtf_2 <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=F, split_regions="gadm_2")
+
+  fire_comparison <- bind_rows(
+    mtf_0 %>% mutate(level='0'),
+    mtf_1 %>% mutate(level='1'),
+    mtf_2 %>% mutate(level='2')) %>%
+  tidyr::unnest(fires) %>%
+    select_if(grepl("date|level|fire_.*", names(.))) %>%
+    tidyr::pivot_longer(cols=-c(level, date)) %>%
+    mutate(name=stringr::str_extract(name, '(fire_[^\\_]*)')) %>%
+    group_by(date, level, name) %>%
+    summarise(value=sum(value, na.rm=T)) %>%
+    pivot_wider(names_from=level, values_from=value, names_prefix='value_')
+
+  expect_equal(fire_comparison$value_0, fire_comparison$value_1)
+  expect_equal(fire_comparison$value_0, fire_comparison$value_2)
+
+  ggplot(fire_comparison) +
+    geom_line(aes(date, value, col=level)) +
+    facet_wrap(~name + level)
 
 
 })

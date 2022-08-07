@@ -205,6 +205,7 @@ fire.summary <- function(date, extent, duration_hour, f.sf){
 #' @param mt
 #' @param duration_hour
 #' @param split_days whether or not to split fires by their "age" (in days) before they reach the city
+#' @param split_regions split fire by GADM regions? either NULL, gadm_0 or gadm_1,
 #'
 #' @return
 #' @export
@@ -212,10 +213,11 @@ fire.summary <- function(date, extent, duration_hour, f.sf){
 fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
                                  split_days=F,
                                  parallel=T,
-                                 mc.cores=max(parallel::detectCores()-1,1)){
+                                 mc.cores=max(parallel::detectCores()-1,1),
+                                 split_regions=NULL){
 
   if(!all(c("location_id", "date", "trajs") %in% names(mt))){
-    stop("wt should  contain the following columns: ",paste("location_id", "date", "trajs"))
+    stop("wt should  contain the following columns: ", paste("location_id", "date", "trajs"))
   }
 
   # Split by run
@@ -235,7 +237,8 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
   mtf$date_group <- date_group_fn(mtf$date_fire)
 
   print("Attaching fires (month by month)")
-  mtf <- parallel::mclapply(base::split(mtf, mtf$date_group),
+  lapply_fn <- utils.lapply_fn(parallel=parallel, mc.cores=mc.cores)
+  mtf <- lapply_fn(base::split(mtf, mtf$date_group),
          function(mtf_chunk){
            tryCatch({
              print(unique(mtf_chunk$date_group))
@@ -245,6 +248,16 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
                                extent.sp=extent.sp,
                                show.progress=F,
                                parallel=F)
+
+             # User can decide to add a regional information to fires
+             if(!is.null(split_regions) && split_regions %in% c("gadm_0", "gadm_1", "gadm_2")){
+               level <- as.numeric(gsub("gadm_","",split_regions))
+               split_region_sp <- creahelpers::get_adm(res="low", level=level)
+               split_region_sp@data["id"] <- split_region_sp@data[paste0("GID_",level)]
+               split_region_sp <- split_region_sp["id"]
+             }else{
+               split_region_sp <- NULL
+             }
 
              if(is.null(f.sf)){
                warning("Didn't find any fire.")
@@ -256,7 +269,8 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
                  extent=mtf_chunk$extent,
                  f.sf=list(f.sf),
                  delay_hour=delay_hour,
-                 SIMPLIFY = F
+                 SIMPLIFY = F,
+                 split_region_sp=list(split_region_sp)
                )
              }
              return(mtf_chunk)
@@ -264,18 +278,19 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
              warning("Failed to attach fire to trajectories: ", e, "\n: ", mtf_chunk)
              return(NULL)
            })
-         }, mc.cores = ifelse(parallel, mc.cores,1)) %>%
+         }) %>%
     subset(unlist(lapply(., is.data.frame))) %>% # Sometimes a core fails
     do.call(bind_rows,.)
 
   print("Regroup by day (join runs)")
 
   if(split_days){
+    if(!is.null(split_regions)){stop("split_days and split_regions not supported together")}
     fire_data <- mtf %>%
       tidyr::unnest(fires) %>%
       mutate(age_fire=difftime(as.Date(date), as.Date(date_fire), units="days")) %>%
       group_by(location_id, date, age_fire) %>%
-      summarise_at(vars(starts_with("fire_")), mean, na.rm=T) %>%
+      summarise_at(vars(starts_with("fire_")), sum, na.rm=T) %>%
       tidyr::pivot_wider(c(location_id, date),
                          names_from=age_fire,
                          names_prefix="dayminus",
@@ -284,7 +299,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
     fire_data <-  mtf %>%
       tidyr::unnest(fires) %>%
       group_by(location_id, date) %>%
-      summarise_at(vars(starts_with("fire_")), mean, na.rm=T)
+      summarise_at(vars(starts_with("fire_")), sum, na.rm=T)
   }
 
 
@@ -309,8 +324,11 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
 #' @return tibble of fires
 #'
 #' @examples
-fire.attach_to_trajs_run <- function(date_fire, extent, f.sf,
-                                     delay_hour=24){
+fire.attach_to_trajs_run <- function(date_fire,
+                                     extent,
+                                     f.sf,
+                                     delay_hour=24,
+                                     split_region_sp=NULL){
 
   if(nrow(f.sf)==0){
     return(tibble(fire_frp=0, fire_count=0))
@@ -319,21 +337,37 @@ fire.attach_to_trajs_run <- function(date_fire, extent, f.sf,
   extent.sf <- sf::st_sfc(extent)
   sf::st_crs(extent.sf) <- sf::st_crs(f.sf)
 
-  f.sf %>%
+  fires <- f.sf %>%
     # TODO devise a more accurate way yet not as slow as fully granular method
     filter(acq_date <= lubridate::date(date_fire),
            acq_date >= lubridate::date(date_fire) - lubridate::hours(delay_hour)) %>%
-    filter(nrow(.)>0 & suppressMessages(sf::st_intersects(., extent.sf, sparse = F))) %>%
-     as.data.frame() %>%
-  select(acq_date, frp) %>%
+    filter(nrow(.)>0 & suppressMessages(sf::st_intersects(., extent.sf, sparse = F)))
+
+  if(nrow(fires)==0){
+    return(tibble(fire_frp=0, fire_count=0))
+  }
+
+  if(!is.null(split_region_sp)){
+    if(!"id" %in% names(split_region_sp)){
+      stop("split_region_sp needs an id field")
+    }
+    fires$region_id <- as(fires, "Spatial") %>% sp::over(split_region_sp) %>% pull(id)
+  }else{
+    fires <- fires %>% tibble::add_column(region_id="")
+  }
+
+  fires %>%
+    as.data.frame() %>%
+    select(region_id, acq_date, frp) %>%
   # full_join(trajs_run, by = character()) %>%
   # filter(as.POSIXct(acq_date, tz="UTC") <= traj_dt,
   #        as.POSIXct(acq_date, tz="UTC") >= traj_dt - lubridate::hours(delay_hour)) %>%
-  group_by() %>%
-  summarise(
-    fire_frp=sum(frp, na.rm=T),
-    fire_count=dplyr::n()
-  )
+    group_by(region_id) %>%
+    summarise(
+      fire_frp=sum(frp, na.rm=T),
+      fire_count=dplyr::n()
+    ) %>%
+    tidyr::pivot_wider(names_from=region_id, values_from=c(fire_frp, fire_count))
 }
 
 
