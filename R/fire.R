@@ -252,7 +252,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
              # User can decide to add a regional information to fires
              if(!is.null(split_regions) && split_regions %in% c("gadm_0", "gadm_1", "gadm_2")){
                level <- as.numeric(gsub("gadm_","",split_regions))
-               split_region_sp <- creahelpers::get_adm(res="low", level=level)
+               split_region_sp <- creahelpers::get_adm(res="low", level=level, method='rmapshaper')
                split_region_sp@data["id"] <- split_region_sp@data[paste0("GID_",level)]
                split_region_sp <- split_region_sp["id"]
              }else{
