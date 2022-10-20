@@ -48,7 +48,7 @@ test_that("attaching fire - trajectories. Both vector and raster", {
   library(tictoc)
   library(tidyverse)
 
-  date_from <- lubridate::today() - 10
+  date_from <- lubridate::today() - 20
   date_to <- lubridate::today() - 5
 
   dates <- seq(as.Date(date_from), as.Date(date_to), by="day")
@@ -179,7 +179,7 @@ test_that("attaching fire with split_regions", {
   dates <- seq(as.Date(date_from), as.Date(date_to), by="day")
   buffer_km <- 50
 
-  l <- rcrea::locations(city="Delhi", with_geometry=T)
+  l <- rcrea::locations(city="Jakarta", with_geometry=T)
 
   creatrajs::fire.download(
     date_from=as.Date(date_from)-1,

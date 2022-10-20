@@ -214,7 +214,8 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
                                  split_days=F,
                                  parallel=T,
                                  mc.cores=max(parallel::detectCores()-1,1),
-                                 split_regions=NULL){
+                                 split_regions=NULL,
+                                 adm_res='low'){
 
   if(!all(c("location_id", "date", "trajs") %in% names(mt))){
     stop("wt should  contain the following columns: ", paste("location_id", "date", "trajs"))
@@ -252,7 +253,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
              # User can decide to add a regional information to fires
              if(!is.null(split_regions) && split_regions %in% c("gadm_0", "gadm_1", "gadm_2")){
                level <- as.numeric(gsub("gadm_","",split_regions))
-               split_region_sp <- creahelpers::get_adm(res="low", level=level)
+               split_region_sp <- creahelpers::get_adm(res=adm_res, level=level)
                split_region_sp@data["id"] <- split_region_sp@data[paste0("GID_",level)]
                split_region_sp <- split_region_sp["id"]
              }else{
@@ -351,23 +352,20 @@ fire.attach_to_trajs_run <- function(date_fire,
     if(!"id" %in% names(split_region_sp)){
       stop("split_region_sp needs an id field")
     }
-    fires$region_id <- as(fires, "Spatial") %>% sp::over(split_region_sp) %>% pull(id)
+    fires$region_id <- paste0('_', as(fires, "Spatial") %>% sp::over(split_region_sp) %>% pull(id))
   }else{
-    fires <- fires %>% tibble::add_column(region_id="")
+    fires <- fires %>% tibble::add_column(region_id='')
   }
 
-  fires %>%
+  result <- fires %>%
     as.data.frame() %>%
     select(region_id, acq_date, frp) %>%
-  # full_join(trajs_run, by = character()) %>%
-  # filter(as.POSIXct(acq_date, tz="UTC") <= traj_dt,
-  #        as.POSIXct(acq_date, tz="UTC") >= traj_dt - lubridate::hours(delay_hour)) %>%
     group_by(region_id) %>%
     summarise(
       fire_frp=sum(frp, na.rm=T),
       fire_count=dplyr::n()
     ) %>%
-    tidyr::pivot_wider(names_from=region_id, values_from=c(fire_frp, fire_count))
+    tidyr::pivot_wider(names_from=region_id, values_from=c(fire_frp, fire_count), names_sep='')
 }
 
 
