@@ -335,12 +335,13 @@ trajs.buffer_pts <- function(trajs, buffer_km, res_deg){
 }
 
 
-trajs.cache_filename <- function(location_id, met_type, height, duration_hour, date){
+trajs.cache_filename <- function(location_id, met_type, height, duration_hour, hours, date){
   paste(tolower(location_id),
         gsub("\\.","",tolower(met_type)),
         height,
         duration_hour,
         gsub("-","",date),
+        paste(hours, collapse='_'),
         "RDS",
         sep=".")
 }
