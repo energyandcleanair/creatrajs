@@ -51,7 +51,8 @@ trajs.get <- function(dates,
                                    met_type=met_type,
                                    date=date,
                                    height=height,
-                                   duration_hour)
+                                   duration_hour,
+                                   hours=hours)
 
         if(!is.null(found) && nrow(found)==1){
           t <- found$trajs[[1]]
@@ -88,7 +89,8 @@ trajs.get <- function(dates,
                         met_type=met_type,
                         date=date,
                         duration_hour=duration_hour,
-                        height=height
+                        height=height,
+                        hours=hours
                         )
       }
 
@@ -125,7 +127,8 @@ trajs.get <- function(dates,
         available_dates_height <- db.available_dates(location_id=unique(location_id),
                            met_type=met_type,
                            duration_hour=duration_hour,
-                           height=unique(l$height))
+                           height=unique(l$height),
+                           hours=hours)
         l %>% rowwise() %>% mutate(is.available=date %in% available_dates_height)
       }) %>% do.call(bind_rows, .)
 
