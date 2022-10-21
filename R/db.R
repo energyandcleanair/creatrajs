@@ -92,8 +92,10 @@ db.remove_trajs <- function(location_id, met_type=NULL, height=NULL, duration_ho
 }
 
 
-db.available_dates <- function(location_id, met_type, height, duration_hour, date=NULL, format="rds"){
-  found <- db.find_trajs(location_id=location_id, met_type=met_type, height=height, duration_hour=duration_hour, format=format, date=date)
+db.available_dates <- function(location_id, met_type, height, duration_hour, date=NULL, format="rds", min_size=500){
+
+  found <- db.find_trajs(location_id=location_id, met_type=met_type, height=height, duration_hour=duration_hour, format=format, date=date) %>%
+    filter(size>min_size)
   dates <- unlist(lapply(found$metadata, function(x) jsonlite::fromJSON(x)$date)) %>%
     as.Date()
   return(dates)
