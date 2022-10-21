@@ -12,7 +12,7 @@ db.get_gridfs <- function(){
 
 
 db.get_unique_columns <- function(){
-  c("location_id","date","duration_hour", "height", "met_type", "format")
+  c("location_id","date","duration_hour", "height", "met_type", "format", "hours")
 }
 
 
@@ -39,7 +39,7 @@ db.setup_db <- function(){
 
 
 db.upload_trajs <- function(trajs,
-                            location_id, met_type, height, duration_hour, date){
+                            location_id, met_type, height, duration_hour, hours, date){
   fs <- db.get_gridfs()
   tmpdir <- tempdir()
   filepath <- file.path(tmpdir, "trajs.RDS")
@@ -51,6 +51,7 @@ db.upload_trajs <- function(trajs,
                    height=height,
                    met_type=met_type,
                    date=date,
+                   hours=paste0(hours, collapse=','),
                    format="rds")
 
   # Remove first if exists
@@ -68,11 +69,12 @@ db.upload_trajs <- function(trajs,
 }
 
 
-db.find_trajs <- function(location_id, met_type=NULL, height=NULL, duration_hour=NULL, date=NULL, format="rds"){
+db.find_trajs <- function(location_id, met_type=NULL, height=NULL, duration_hour=NULL, date=NULL, hours=NULL, format="rds"){
   fs <- db.get_gridfs()
 
   filter <- list(metadata.location_id=location_id,
                    metadata.duration_hour=duration_hour,
+                   metadata.hours=paste0(hours, collapse=','),
                    metadata.height=height,
                    metadata.met_type=met_type,
                    metadata.date=date,
@@ -83,18 +85,20 @@ db.find_trajs <- function(location_id, met_type=NULL, height=NULL, duration_hour
 }
 
 
-db.remove_trajs <- function(location_id, met_type=NULL, height=NULL, duration_hour=NULL, date=NULL, format="rds"){
+db.remove_trajs <- function(location_id, met_type=NULL, height=NULL, duration_hour=NULL, date=NULL, hours=NULL, format="rds"){
   fs <- db.get_gridfs()
-  found <- db.find_trajs(location_id=location_id, met_type=met_type, height=height, duration_hour=duration_hour, date=date, format=format)
+  found <- db.find_trajs(location_id=location_id, met_type=met_type, height=height,
+                         duration_hour=duration_hour, date=date, hours=hours, format=format)
 
   if(nrow(found)>0) fs$remove(paste0("id:", found$id))
   print(sprintf("%d row(s) removed", nrow(found)))
 }
 
 
-db.available_dates <- function(location_id, met_type, height, duration_hour, date=NULL, format="rds", min_size=500){
+db.available_dates <- function(location_id, met_type, height, duration_hour, hours=NULL, date=NULL, format="rds", min_size=500){
 
-  found <- db.find_trajs(location_id=location_id, met_type=met_type, height=height, duration_hour=duration_hour, format=format, date=date)
+  found <- db.find_trajs(location_id=location_id, met_type=met_type, height=height,
+                         duration_hour=duration_hour, hours=hours, format=format, date=date)
 
   # Filter throws error because of date
   found <- found[found$size > min_size,]
@@ -105,9 +109,11 @@ db.available_dates <- function(location_id, met_type, height, duration_hour, dat
 }
 
 
-db.download_trajs <- function(location_id=NULL, met_type=NULL, height=NULL, duration_hour=NULL, date=NULL, format="rds", min_size=500){
+db.download_trajs <- function(location_id=NULL, met_type=NULL, height=NULL, duration_hour=NULL,
+                              hours=NULL, date=NULL, format="rds", min_size=500){
   fs <- db.get_gridfs()
-  found <- db.find_trajs(location_id=location_id, met_type=met_type, height=height, duration_hour=duration_hour, date=date, format=format)
+  found <- db.find_trajs(location_id=location_id, met_type=met_type, height=height,
+                         duration_hour=duration_hour, hours=hours, date=date, format=format)
 
   # Filter throws error because of date
   found <- found[found$size > min_size,]
