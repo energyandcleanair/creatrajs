@@ -59,7 +59,7 @@ trajs.get <- function(dates,
             t <- t %>% rename(date_recept=date)
           }
 
-          if(nrow(t)==1 & recompute_if_cache_na){
+          if(nrow(t)<=1 & recompute_if_cache_na){
             print('Cached trajectory exists but is empty. Recomputing')
           }else{
             return(t)
