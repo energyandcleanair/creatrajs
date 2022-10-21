@@ -363,7 +363,7 @@ hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timez
 
   # Build date/hour combinations in UTC
   offset <- as.double(as.POSIXct(date,tz=timezone)-as.POSIXct(date,tz="UTC"), units="hours")
-  hours_utc <- hours + offset
+  hours_utc <- hours + round(offset)
 
   tryCatch({
     trajs <- splitr::hysplit_trajectory(
