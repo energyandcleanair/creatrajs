@@ -102,9 +102,10 @@ db.available_dates <- function(location_id, met_type, height, duration_hour, dat
 }
 
 
-db.download_trajs <- function(location_id=NULL, met_type=NULL, height=NULL, duration_hour=NULL, date=NULL, format="rds"){
+db.download_trajs <- function(location_id=NULL, met_type=NULL, height=NULL, duration_hour=NULL, date=NULL, format="rds", min_size=500){
   fs <- db.get_gridfs()
-  found <- db.find_trajs(location_id=location_id, met_type=met_type, height=height, duration_hour=duration_hour, date=date, format=format)
+  found <- db.find_trajs(location_id=location_id, met_type=met_type, height=height, duration_hour=duration_hour, date=date, format=format) %>%
+    filter(size>min_size)
 
   if(nrow(found)==0) return(NULL)
 
