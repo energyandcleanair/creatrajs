@@ -94,8 +94,11 @@ db.remove_trajs <- function(location_id, met_type=NULL, height=NULL, duration_ho
 
 db.available_dates <- function(location_id, met_type, height, duration_hour, date=NULL, format="rds", min_size=500){
 
-  found <- db.find_trajs(location_id=location_id, met_type=met_type, height=height, duration_hour=duration_hour, format=format, date=date) %>%
-    filter(size>min_size)
+  found <- db.find_trajs(location_id=location_id, met_type=met_type, height=height, duration_hour=duration_hour, format=format, date=date)
+
+  # Filter throws error because of date
+  found <- found[found$size > min_size,]
+
   dates <- unlist(lapply(found$metadata, function(x) jsonlite::fromJSON(x)$date)) %>%
     as.Date()
   return(dates)
@@ -104,8 +107,10 @@ db.available_dates <- function(location_id, met_type, height, duration_hour, dat
 
 db.download_trajs <- function(location_id=NULL, met_type=NULL, height=NULL, duration_hour=NULL, date=NULL, format="rds", min_size=500){
   fs <- db.get_gridfs()
-  found <- db.find_trajs(location_id=location_id, met_type=met_type, height=height, duration_hour=duration_hour, date=date, format=format) %>%
-    filter(size>min_size)
+  found <- db.find_trajs(location_id=location_id, met_type=met_type, height=height, duration_hour=duration_hour, date=date, format=format)
+
+  # Filter throws error because of date
+  found <- found[found$size > min_size,]
 
   if(nrow(found)==0) return(NULL)
 
