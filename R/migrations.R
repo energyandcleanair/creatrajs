@@ -2,7 +2,7 @@
 ## Functions to update existing data to new structure e.g. adding a field
 ##########################################################################
 
-migrations.fill_missing_fields <- function(){
+migrations.fill_missing_fields <- function(start_from=1){
   library(creatrajs)
   found <- creatrajs::db.find_trajs(location_id=NULL)
 
@@ -11,14 +11,23 @@ migrations.fill_missing_fields <- function(){
   fs.files <- db.get_gridfs_files()
   ids <- paste0("id:",found$id)
 
-  trajs <- pbapply::pblapply(seq(1, nrow(found)), function(i){
+  trajs <- pbapply::pblapply(seq(start_from, nrow(found)), function(i){
     print(i)
     id <- found[i,]$id
     metadata <- jsonlite::parse_json(found[i,]$metadata)
 
     filepath <- tempfile()
-    fs$download(paste0("id:", id), filepath)
-    trajs <- readRDS(filepath)
+    trajs <- try({
+      fs$download(paste0("id:", id), filepath)
+      return(readRDS(filepath))
+    }, error=function(e){
+      return(NULL)
+    })
+
+    if(is.null(trajs)){
+      print("Failed to read trajs. Ignoring")
+      return(NULL)
+    }
 
     if(nrow(trajs)==1){
       fs$remove(paste0("id:", id))
