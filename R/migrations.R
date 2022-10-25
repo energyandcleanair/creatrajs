@@ -17,7 +17,7 @@ migrations.fill_missing_fields <- function(start_from=1){
     metadata <- jsonlite::parse_json(found[i,]$metadata)
 
     filepath <- tempfile()
-    trajs <- try({
+    trajs <- tryCatch({
       fs$download(paste0("id:", id), filepath)
       return(readRDS(filepath))
     }, error=function(e){
