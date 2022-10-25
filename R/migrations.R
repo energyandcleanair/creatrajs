@@ -4,10 +4,12 @@
 
 migrations.fill_missing_fields <- function(start_from=1){
   library(creatrajs)
-  found <- creatrajs::db.find_trajs(location_id=NULL)
+  # found <- creatrajs::db.find_trajs(location_id=NULL)
 
   # filling hours field
   fs <- creatrajs::db.get_gridfs()
+  found <- fs$find('{"metadata.hours": {"$exists": false}}')
+
   fs.files <- db.get_gridfs_files()
   ids <- paste0("id:",found$id)
 
