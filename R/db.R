@@ -10,6 +10,11 @@ db.get_gridfs <- function(){
   mongolite::gridfs(db="creatrajs", prefix="trajectories", url=connection_string)
 }
 
+db.get_gridfs_files <- function(){
+  readRenviron(".Renviron")
+  connection_string=Sys.getenv("CREA_MONGODB_URL")
+  mongolite::mongo(db="creatrajs", collection="trajectories.files", url=connection_string)
+}
 
 db.get_unique_columns <- function(){
   c("location_id","date","duration_hour", "height", "met_type", "format", "hours")
@@ -40,18 +45,27 @@ db.setup_db <- function(){
 
 db.upload_trajs <- function(trajs,
                             location_id, met_type, height, duration_hour, hours, date){
+
+
+  # Check format
+  ok <- T
+  ok <- ok & is.data.frame(trajs)
+
   fs <- db.get_gridfs()
   tmpdir <- tempdir()
   filepath <- file.path(tmpdir, "trajs.RDS")
   saveRDS(trajs, filepath)
   date <- strftime(as.Date(date),"%Y-%m-%d")
 
+  hours <- if(is.null(hours) || is.na(hours)) NULL else {paste0(hours, collapse=',')}
+  height <- if(is.null(height) || is.na(height)) NULL else {height}
+
   metadata <- list(location_id=location_id,
                    duration_hour=duration_hour,
                    height=height,
                    met_type=met_type,
                    date=date,
-                   hours=paste0(hours, collapse=','),
+                   hours=hours,
                    format="rds")
 
   # Remove first if exists
@@ -72,9 +86,12 @@ db.upload_trajs <- function(trajs,
 db.find_trajs <- function(location_id, met_type=NULL, height=NULL, duration_hour=NULL, date=NULL, hours=NULL, format="rds"){
   fs <- db.get_gridfs()
 
+  hours <- if(is.null(hours) || is.na(hours)) NULL else {paste0(hours, collapse=',')}
+  height <- if(is.null(height) || is.na(height)) NULL else {height}
+
   filter <- list(metadata.location_id=location_id,
                    metadata.duration_hour=duration_hour,
-                   metadata.hours=paste0(hours, collapse=','),
+                   metadata.hours=hours,
                    metadata.height=height,
                    metadata.met_type=met_type,
                    metadata.date=date,
@@ -136,45 +153,4 @@ db.download_trajs <- function(location_id=NULL, met_type=NULL, height=NULL, dura
   tibble(result)
 }
 
-
-
-#' Uplaod trajectories cached using previous system (i.e. on disk)
-#'
-#' @return
-#' @export
-#'
-#' @examples
-db.upload_filecached <- function(){
-  library(creatrajs)
-  paths <- list.files(utils.get_cache_folder("trajs"), full.names = T)
-  names <- list.files(utils.get_cache_folder("trajs"))
-
-  files <- tibble(name=basename(names), path=paths) %>%
-    filter(stringr::str_detect(name, "gdas1")) %>%
-    tidyr::separate(name, c("location_id", "details"), sep="\\.gdas1\\.") %>%
-    tidyr::separate(details, c("height","duration_hour","date","shouldbeRDS"), sep="\\.") %>%
-    filter(shouldbeRDS=="RDS")
-
-  f$duration_hour <- as.numeric(f$duration_hour)
-  files$size <- file.info(files$path)$size
-  files$height <- as.numeric(files$height)
-  files$date <- strptime(files$date, "%Y%m%d")
-  files$met_type <- "gdas1"
-  files <- files %>% filter(size>60)
-  files <- files %>% filter(height==10)
-  files <- files %>% filter(!location_id %in% c("3f21f025-610c-4471-8fec-0001718dd05e",
-                                               "e710800e-41de-4c3d-ada8-6931b23d94da"))
-
-  for(i in seq(nrow(files))){
-    print(sprintf("%d/%d",i,nrow(files)))
-    f <- files[i,]
-    db.upload_trajs(trajs=readRDS(f$path),
-                    date=f$date,
-                    location_id=f$location_id,
-                    met_type=f$met_type,
-                    duration_hour=f$duration_hour,
-                    height=f$height
-                    )
-  }
-}
 
