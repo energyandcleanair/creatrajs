@@ -75,7 +75,12 @@ fire.download <- function(date_from=NULL, date_to=NULL, region="Global"){
 #' @export
 #'
 #' @examples
-fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=NULL, show.progress=T,
+fire.read <- function(date_from=NULL,
+                      date_to=NULL,
+                      region="Global",
+                      sf_or_sp="sp",
+                      extent.sp=NULL,
+                      show.progress=T,
                       parallel=T,
                       mc.cores=max(parallel::detectCores()-1,1)){
 
@@ -116,11 +121,11 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
     dplyr::distinct(dates, .keep_all = T) %>%
     dplyr::pull(files)
 
-  read.csv.fire <-function(f){
+  read.csv.fire <-function(file){
     tryCatch({
       # sp::over so much faster than sf (~5x)
       # fread vs read.csv also saves a lot of time
-      d <- data.table::fread(f,
+      d <- data.table::fread(file,
                              stringsAsFactors = F,
                              colClasses = c("acq_time"="character",
                                             "version"="character"))[,c("latitude","longitude","acq_date","frp")]
@@ -133,8 +138,12 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
         df <- df[!is.na(sp::over(df, as(extent.sp,"SpatialPolygons"))),]
       }
 
-      df %>%
-        sf::st_as_sf() # To allow bind_rows (vs rbind)
+      if(sf_or_sp=='sf'){
+        return(df %>%
+                 sf::st_as_sf())
+      }else{
+        return(df)
+      }
 
     }, error=function(c){
       warning(paste("Failed reading file", f))
@@ -150,11 +159,20 @@ fire.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=N
     return(tibble())
   }
 
-  fires <- do.call("bind_rows",
-                   lapply_(files_sorted,
-                           read.csv.fire,
-                           mc.cores = ifelse(parallel, mc.cores, 1)))
-  fires
+  fires_list <- lapply_(files_sorted,
+                        read.csv.fire,
+                        mc.cores = ifelse(parallel, mc.cores, 1))
+
+  if(sum(sapply(fires_list, nrow))==0){
+    return(tibble())
+  }
+
+  if(sf_or_sp=="sf"){
+    fires <- do.call("bind_rows", fires_list)
+  }else{
+    fires <- do.call("rbind", fires_list)
+  }
+  return(fires)
 }
 
 
@@ -213,6 +231,7 @@ fire.summary <- function(date, extent, duration_hour, f.sf){
 fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
                                  split_days=F,
                                  parallel=T,
+                                 sf_or_sp="sp",
                                  mc.cores=max(parallel::detectCores()-1,1),
                                  split_regions=NULL,
                                  adm_res='low'){
@@ -237,6 +256,16 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
   date_group_fn <- function(x) strftime(x,"%Y%m") # Can be year, month, or even date (lot of redundancy in the latter case)
   mtf$date_group <- date_group_fn(mtf$date_fire)
 
+  # Read GADM if need be
+  if(!is.null(split_regions) && split_regions %in% c("gadm_0", "gadm_1", "gadm_2")){
+    level <- as.numeric(gsub("gadm_","",split_regions))
+    split_region_sp <- creahelpers::get_adm(res=adm_res, level=level)
+    split_region_sp@data["id"] <- split_region_sp@data[paste0("GID_",level)]
+    split_region_sp <- split_region_sp["id"]
+  }else{
+    split_region_sp <- NULL
+  }
+
   print("Attaching fires (month by month)")
   lapply_fn <- utils.lapply_fn(parallel=parallel, mc.cores=mc.cores)
   mtf <- lapply_fn(base::split(mtf, mtf$date_group),
@@ -244,23 +273,14 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
            tryCatch({
              print(unique(mtf_chunk$date_group))
              extent.sp <- sf::as_Spatial(mtf_chunk$extent[!sf::st_is_empty(mtf_chunk$extent)])
-             f.sf <- fire.read(date_from=min(mtf_chunk$date_fire, na.rm=T)-lubridate::days(1),
+             fires <- fire.read(date_from=min(mtf_chunk$date_fire, na.rm=T)-lubridate::days(1),
                                date_to=max(mtf_chunk$date_fire, na.rm=T),
                                extent.sp=extent.sp,
+                               sf_or_sp = sf_or_sp,
                                show.progress=F,
                                parallel=F)
 
-             # User can decide to add a regional information to fires
-             if(!is.null(split_regions) && split_regions %in% c("gadm_0", "gadm_1", "gadm_2")){
-               level <- as.numeric(gsub("gadm_","",split_regions))
-               split_region_sp <- creahelpers::get_adm(res=adm_res, level=level)
-               split_region_sp@data["id"] <- split_region_sp@data[paste0("GID_",level)]
-               split_region_sp <- split_region_sp["id"]
-             }else{
-               split_region_sp <- NULL
-             }
-
-             if(is.null(f.sf)){
+             if(is.null(fires)){
                warning("Didn't find any fire.")
                mtf_chunk$fires <- list(tibble())
              }else{
@@ -268,7 +288,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
                  fire.attach_to_trajs_run,
                  date_fire=mtf_chunk$date_fire,
                  extent=mtf_chunk$extent,
-                 f.sf=list(f.sf),
+                 fires=list(fires),
                  delay_hour=delay_hour,
                  SIMPLIFY = F,
                  split_region_sp=list(split_region_sp)
@@ -327,24 +347,43 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
 #' @examples
 fire.attach_to_trajs_run <- function(date_fire,
                                      extent,
-                                     f.sf,
+                                     fires,
                                      delay_hour=24,
                                      split_region_sp=NULL){
 
-  if(nrow(f.sf)==0){
+  if(nrow(fires)==0){
     return(tibble(fire_frp=0, fire_count=0))
   }
 
-  extent.sf <- sf::st_sfc(extent)
-  sf::st_crs(extent.sf) <- sf::st_crs(f.sf)
+  if("sf" %in% class(fires)){
+    fires <- sf::as_Spatial(fires)
+  }
 
-  fires <- f.sf %>%
-    # TODO devise a more accurate way yet not as slow as fully granular method
-    filter(acq_date <= lubridate::date(date_fire),
-           acq_date >= lubridate::date(date_fire) - lubridate::hours(delay_hour)) %>%
-    filter(nrow(.)>0 & suppressMessages(sf::st_intersects(., extent.sf, sparse = F)))
+    # extent.sf <- sf::st_sfc(extent)
+    # sf::st_crs(extent.sf) <- sf::st_crs(fires)
+    #
+    # filtered_fires <- fires %>%
+    #   # TODO devise a more accurate way yet not as slow as fully granular method
+    #   filter(acq_date <= lubridate::date(date_fire),
+    #          acq_date >= lubridate::date(date_fire) - lubridate::hours(delay_hour)) %>%
+    #   filter(nrow(.)>0 & suppressMessages(sf::st_intersects(., extent.sf, sparse = F)))
+    # filtered_fires_sp <- as(filtered_fires, "Spatial")
 
-  if(nrow(fires)==0){
+
+  if(grepl("Spatial", class(fires)[1])){
+    extent.sp <- as(extent, "Spatial")
+
+    # set the coordinate reference system of extent.sp to match f.sf
+    proj4string(extent.sp) <- CRS(proj4string(fires))
+
+    # filter the fires based on date and extent
+    filtered_fires <- fires[fires$acq_date <= as.Date(date_fire) &
+                              fires$acq_date >= as.Date(date_fire) - lubridate::hours(delay_hour) &
+                             !is.na(sp::over(fires, extent.sp)),]
+  }
+
+
+  if(nrow(filtered_fires)==0){
     return(tibble(fire_frp=0, fire_count=0))
   }
 
@@ -352,12 +391,12 @@ fire.attach_to_trajs_run <- function(date_fire,
     if(!"id" %in% names(split_region_sp)){
       stop("split_region_sp needs an id field")
     }
-    fires$region_id <- paste0('_', as(fires, "Spatial") %>% sp::over(split_region_sp) %>% pull(id))
+    filtered_fires$region_id <- paste0('_', filtered_fires %>% sp::over(split_region_sp) %>% pull(id))
   }else{
-    fires <- fires %>% tibble::add_column(region_id='')
+    filtered_fires <- filtered_fires %>% as.data.frame() %>% tibble::add_column(region_id='')
   }
 
-  result <- fires %>%
+  result <- filtered_fires %>%
     as.data.frame() %>%
     select(region_id, acq_date, frp) %>%
     group_by(region_id) %>%
@@ -366,6 +405,8 @@ fire.attach_to_trajs_run <- function(date_fire,
       fire_count=dplyr::n()
     ) %>%
     tidyr::pivot_wider(names_from=region_id, values_from=c(fire_frp, fire_count), names_sep='')
+
+  return(result)
 }
 
 
@@ -592,20 +633,16 @@ fire.attach_to_disps <- function(mt, buffer_km=10, delay_hour=24){
                            function(mtf){
 
                              extent.sp <- sf::as_Spatial(mtf$extent[!sf::st_is_empty(mtf$extent)])
-                             f.sf <- fire.read(date_from=min(mtf$min_date_fire, na.rm=T),
+                             fires <- fire.read(date_from=min(mtf$min_date_fire, na.rm=T),
                                                date_to=max(mtf$max_date_fire, na.rm=T),
                                                extent.sp=extent.sp,
                                                show.progress=F)
-
-                             # if(nrow(f.sf)==0){
-                             #   warning("No fire found. Something's probably wrong")
-                             # }
 
                              mtf$fires <- mapply(
                                fire.attach_to_trajs_run,
                                trajs_run=mtf$trajs,
                                extent=mtf$extent,
-                               f.sf=list(f.sf),
+                               fires=list(fires),
                                delay_hour=delay_hour,
                                SIMPLIFY = F
                              )

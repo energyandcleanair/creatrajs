@@ -1,20 +1,34 @@
 test_that("getting fire works", {
 
-  require(rcrea)
-  require(testthat)
+  library(rcrea)
+  library(testthat)
+  library(tictoc)
 
-  date_from <- lubridate::today() - 10
-  date_to <- lubridate::today() - 5
+  # Pick a fire season to have enough fires to test performance
+  date_from <- "2022-10-01"
+  date_to <- "2022-10-30"
 
   creatrajs::fire.download(date_from=date_from, date_to=date_to)
 
-  f <- creatrajs::fire.read(
+  tic()
+  f_sf <- creatrajs::fire.read(
     date_from=date_from,
     date_to=date_to,
     region="Global",
     extent.sp=NULL)
+  toc()
+
+  tic()
+  f_sp <- creatrajs::fire.read(
+    date_from=date_from,
+    date_to=date_to,
+    sf_or_sp = "sp",
+    region="Global",
+    extent.sp=NULL)
+  toc()
 
   expect_gt(nrow(f), 190000)
+
 
 
   # Testing that extent filtering works as well
@@ -27,13 +41,16 @@ test_that("getting fire works", {
                            with_geometry = T)
 
   extent.sp <- m$geometry[[1]] %>%
-    sf::st_buffer(1) %>%
+    sf::st_buffer(2) %>%
     as("Spatial")
 
+  tic()
   f.delhi <- creatrajs::fire.read(date_from=date_from,
                                  date_to=date_to,
                                  region="Global",
-                                 extent.sp=extent.sp)
+                                 extent.sp=extent.sp
+                                 )
+  toc()
 
   expect_gt(nrow(f.delhi), 500)
   expect_lt(nrow(f.delhi), 1000)
@@ -174,12 +191,12 @@ test_that("attaching fire with split_regions", {
 
   # Should be recent enough to have fire
   # old enough to have weather
-  date_from  <- lubridate::today() - lubridate::days(40)
-  date_to  <- lubridate::today() - lubridate::days(40)
+  date_from  <- "2022-10-05"
+  date_to  <-"2022-10-15"
   dates <- seq(as.Date(date_from), as.Date(date_to), by="day")
   buffer_km <- 50
 
-  l <- rcrea::locations(city="Jakarta", with_geometry=T)
+  l <- rcrea::locations(city="Delhi", with_geometry=T)
 
   creatrajs::fire.download(
     date_from=as.Date(date_from)-1,
@@ -196,14 +213,31 @@ test_that("attaching fire with split_regions", {
                                 duration_hour = 120,
                                 hours = c(6)) #seq(0,23)
 
-  mt = tibble(location_id=l$id,
+  mt = tibble(location_id=unique(l$id),
               date=dates,
               trajs=trajs)
 
   # Attach fire
-  mtf_0 <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=F, split_regions="gadm_0")
-  mtf_1 <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=F, split_regions="gadm_1")
-  mtf_2 <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=F, split_regions="gadm_2")
+  library(profvis)
+
+  tic()
+  profvis({
+    mtf_0_sf <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=F, split_regions="gadm_0", parallel=F, sf_or_sp = "sf")
+  })
+  toc()
+  tic()
+  profvis({
+    mtf_0_sp <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=F, split_regions="gadm_0", parallel=F, sf_or_sp = "sp")
+  })
+  toc()
+
+  profvis({
+    mtf_1 <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=F, split_regions="gadm_1", parallel=F)
+  })
+
+  profvis({
+    mtf_2 <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=F, split_regions="gadm_2", parallel=F)
+  })
 
   fire_comparison <- bind_rows(
     mtf_0 %>% mutate(level='0'),
