@@ -257,7 +257,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
   mtf$date_group <- date_group_fn(mtf$date_fire)
 
   # Read GADM if need be
-  if(!is.null(split_regions) && split_regions %in% c("gadm_0", "gadm_1", "gadm_2")){
+  if(!is.null(split_regions) && !is.na(split_regions) && split_regions %in% c("gadm_0", "gadm_1", "gadm_2")){
     level <- as.numeric(gsub("gadm_","",split_regions))
     split_region_sp <- creahelpers::get_adm(res=adm_res, level=level)
     split_region_sp@data["id"] <- split_region_sp@data[paste0("GID_",level)]
@@ -306,7 +306,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
   print("Regroup by day (join runs)")
 
   if(split_days){
-    if(!is.null(split_regions)){stop("split_days and split_regions not supported together")}
+    if(!is.null(split_regions) || !is.na(split_regions)){stop("split_days and split_regions not supported together")}
     fire_data <- mtf %>%
       tidyr::unnest(fires) %>%
       mutate(age_fire=difftime(as.Date(date), as.Date(date_fire), units="days")) %>%
