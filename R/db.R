@@ -57,8 +57,8 @@ db.upload_trajs <- function(trajs,
   saveRDS(trajs, filepath)
   date <- strftime(as.Date(date),"%Y-%m-%d")
 
-  hours <- if(is.null(hours) || is.na(hours)) NULL else {paste0(hours, collapse=',')}
-  height <- if(is.null(height) || is.na(height)) NULL else {height}
+  hours <- if(all(is.null(hours)) || all(is.na(hours))) NULL else {paste0(hours, collapse=',')}
+  height <- if(all(is.null(height)) || all(is.na(height))) NULL else {height}
 
   metadata <- list(location_id=location_id,
                    duration_hour=duration_hour,
@@ -86,8 +86,8 @@ db.upload_trajs <- function(trajs,
 db.find_trajs <- function(location_id, met_type=NULL, height=NULL, duration_hour=NULL, date=NULL, hours=NULL, format="rds"){
   fs <- db.get_gridfs()
 
-  hours <- if(is.null(hours) || is.na(hours)) NULL else {paste0(hours, collapse=',')}
-  height <- if(is.null(height) || is.na(height)) NULL else {height}
+  hours <- if(all(is.null(hours)) || all(is.na(hours))) NULL else {paste0(hours, collapse=',')}
+  height <- if(all(is.null(height)) || all(is.na(height))) NULL else {height}
 
   filter <- list(metadata.location_id=location_id,
                    metadata.duration_hour=duration_hour,

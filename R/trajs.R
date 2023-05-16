@@ -1,3 +1,86 @@
+#' A wrapper to compute trajectories for many cities, many dates conveniently
+#'
+#' @param date_from
+#' @param date_to
+#' @param source
+#' @param geometry
+#' @param met_type
+#' @param height
+#' @param duration_hour
+#' @param hours
+#' @param timezone
+#' @param use_cache
+#' @param save_to_cache
+#' @param parallel
+#' @param mc.cores
+#' @param debug
+#'
+#' @return
+#' @export
+#'
+#' @examples
+trajs.compute <- function(
+  source=NULL,
+  city=NULL,
+  aggregate_level="city",
+  date_from="2020-01-01",
+  date_to=lubridate::today(),
+  met_type=creatrajs::DEFAULT_MET_TYPE,
+  height=creatrajs::DEFAULT_HEIGHT,
+  duration_hour=creatrajs::DEFAULT_DURATION_HOUR,
+  hours=creatrajs::DEFAULT_HOURS,
+  timezone="UTC",
+  use_cache=T, # If False, will not read cache BUT will try to write in it if upload_to_cache
+  save_to_cache=use_cache,
+  parallel=F,
+  mc.cores=max(parallel::detectCores()-1,1),
+  debug=F){
+
+    # Either source or city should be provided
+    if(is.null(source) & all(is.null(city))){
+      stop("Either source or city should be provided")
+    }
+
+    # Apply default values (useful when creaengine calls this function with NULL values)
+    if(is.null(met_type)) source <- creatrajs::DEFAULT_MET_TYPE
+    if(is.null(height)) source <- creatrajs::DEFAULT_HEIGHT
+    if(is.null(duration_hour)) source <- creatrajs::DEFAULT_DURATION_HOUR
+    if(is.null(hours)) source <- creatrajs::DEFAULT_HOURS
+
+
+    l <- rcrea::locations(level=aggregate_level,
+                          city=city,
+                          source=source,
+                          with_geometry = T) %>%
+      dplyr::distinct(id, geometry)
+
+    dates <- seq(as.POSIXct(date_from, "UTC"),
+                as.POSIXct(date_to, "UTC"),
+                by="1 day")
+
+    # Compute trajs
+    # Looping over l rows
+    mapply(function(location_id, geometry){
+      trajs.get(dates=dates,
+                location_id=location_id,
+                geometry=geometry,
+                met_type=met_type,
+                height=height,
+                duration_hour=duration_hour,
+                hours=hours,
+                timezone=timezone,
+                use_cache=use_cache,
+                save_to_cache=save_to_cache,
+                parallel=parallel,
+                mc.cores=mc.cores,
+                debug=debug)},
+      l$id, l["geometry"]) %>%
+    do.call(dplyr::bind_rows, .)
+
+}
+
+
+
 #' Calculate trajectories at a geometry and dates
 #'
 #' @param dates
