@@ -42,7 +42,8 @@ trajs.get <- function(dates,
                             hours,
                             use_cache,
                             save_to_cache,
-                            debug){
+                            debug,
+                            recompute_if_cache_na=T){
     tryCatch({
 
       if(use_cache){
@@ -50,14 +51,20 @@ trajs.get <- function(dates,
                                    met_type=met_type,
                                    date=date,
                                    height=height,
-                                   duration_hour)
+                                   duration_hour,
+                                   hours=hours)
 
         if(!is.null(found) && nrow(found)==1){
           t <- found$trajs[[1]]
           if("date" %in% names(t)){
             t <- t %>% rename(date_recept=date)
           }
-          return(t)
+
+          if(nrow(t)<=1 & recompute_if_cache_na){
+            print('Cached trajectory exists but is empty. Recomputing')
+          }else{
+            return(t)
+          }
         }
       }
 
@@ -82,7 +89,8 @@ trajs.get <- function(dates,
                         met_type=met_type,
                         date=date,
                         duration_hour=duration_hour,
-                        height=height
+                        height=height,
+                        hours=hours
                         )
       }
 
@@ -119,7 +127,8 @@ trajs.get <- function(dates,
         available_dates_height <- db.available_dates(location_id=unique(location_id),
                            met_type=met_type,
                            duration_hour=duration_hour,
-                           height=unique(l$height))
+                           height=unique(l$height),
+                           hours=hours)
         l %>% rowwise() %>% mutate(is.available=date %in% available_dates_height)
       }) %>% do.call(bind_rows, .)
 
@@ -335,12 +344,13 @@ trajs.buffer_pts <- function(trajs, buffer_km, res_deg){
 }
 
 
-trajs.cache_filename <- function(location_id, met_type, height, duration_hour, date){
+trajs.cache_filename <- function(location_id, met_type, height, duration_hour, hours, date){
   paste(tolower(location_id),
         gsub("\\.","",tolower(met_type)),
         height,
         duration_hour,
         gsub("-","",date),
+        paste(hours, collapse='_'),
         "RDS",
         sep=".")
 }
@@ -356,7 +366,7 @@ hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timez
 
   # Build date/hour combinations in UTC
   offset <- as.double(as.POSIXct(date,tz=timezone)-as.POSIXct(date,tz="UTC"), units="hours")
-  hours_utc <- hours + offset
+  hours_utc <- hours + round(offset)
 
   tryCatch({
     trajs <- splitr::hysplit_trajectory(
