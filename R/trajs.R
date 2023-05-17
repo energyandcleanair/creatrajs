@@ -34,7 +34,7 @@ trajs.compute <- function(
   save_to_cache=use_cache,
   parallel=F,
   mc.cores=max(parallel::detectCores()-1,1),
-  debug=F){
+  debug=T){
 
     # Either source or city should be provided
     if(is.null(source) & all(is.null(city))){
@@ -42,11 +42,22 @@ trajs.compute <- function(
     }
 
     # Apply default values (useful when creaengine calls this function with NULL values)
-    if(is.null(met_type)) source <- creatrajs::DEFAULT_MET_TYPE
-    if(is.null(height)) source <- creatrajs::DEFAULT_HEIGHT
-    if(is.null(duration_hour)) source <- creatrajs::DEFAULT_DURATION_HOUR
-    if(is.null(hours)) source <- creatrajs::DEFAULT_HOURS
+    if(is.null(met_type)) met_type <- creatrajs::DEFAULT_MET_TYPE
+    if(is.null(height)) height <- creatrajs::DEFAULT_HEIGHT
+    if(is.null(duration_hour)) duration_hour <- creatrajs::DEFAULT_DURATION_HOUR
+    if(is.null(hours)) hours <- creatrajs::DEFAULT_HOURS
+    if(is.null(date_to)) date_to <- lubridate::today()
+    if(is.null(date_from)) date_from <- lubridate::today() - lubridate::days(7)
+    if(is.null(use_cache)) use_cache <- T
+    if(is.null(save_to_cache)) save_to_cache <- use_cache
 
+    # Print all variables of current environment
+    if(debug){
+      for (obj in ls()) {
+        cat(paste0(obj, ": "))
+        print(get(obj))
+      }
+    }
 
     l <- rcrea::locations(level=aggregate_level,
                           city=city,
