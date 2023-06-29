@@ -1,4 +1,4 @@
-#' Calculate backward dispersion at a geometry and dates
+#' Calculate backward or forward dispersion at a geometry and dates
 #'
 #' @param dates
 #' @param location_id
@@ -18,14 +18,18 @@ dispersion.get <- function(dates,
                       met_type,
                       heights,
                       duration_hour,
+                      direction="backward",
                       timezone="UTC",
+                      convert_to_raster=F,
                       res_deg=0.05,
                       cache_folder=NULL,
                       parallel=F, # NOT TOTALLY WORKING YET (weather download at least is an issue)
                       mc.cores=max(parallel::detectCores()-1,1),
                       ...){
 
-
+  if(!is.null(cache_folder)){
+    dir.create(cache_folder, F, T)
+  }
 
   # Row by row
   dispersion.get.one <- function(date,
@@ -36,7 +40,8 @@ dispersion.get <- function(dates,
                             duration_hour,
                             timezone,
                             cache_folder,
-                            res_deg){
+                            res_deg,
+                            convert_to_raster){
     tryCatch({
 
       # This is so time consuming that
@@ -69,7 +74,8 @@ dispersion.get <- function(dates,
                                   met_type=met_type,
                                   duration_hour=duration_hour,
                                   height=height,
-                                  timezone=timezone
+                                  timezone=timezone,
+                                  direction=direction
           )
 
           if(length(d)==0 || (length(d)==1 && is.na(d))){
@@ -80,16 +86,14 @@ dispersion.get <- function(dates,
           if(!is.null(cache_folder)){
             saveRDS(d, file.cache.sp)
           }
-        }
+      }
 
         # Convert sp data to raster
-        r.count <- dispersion.to_raster(d, res_deg=res_deg)
-        # Save to cache
-        if(!is.null(cache_folder)){
-          saveRDS(d, file.cache.sp)
+        if(convert_to_raster){
+          d <- dispersion.to_raster(d, res_deg=res_deg)
         }
 
-        return(r.count)
+        return(d)
 
       }}, error=function(c){
         print(c)
@@ -123,6 +127,7 @@ dispersion.get <- function(dates,
     height=heights,
     duration_hour=duration_hour,
     timezone=timezone,
+    convert_to_raster=convert_to_raster,
     res_deg=res_deg,
     cache_folder=cache_folder,
     SIMPLIFY=F)
@@ -158,7 +163,7 @@ dispersion.to_raster <- function(d, res_deg){
 
 
 
-hysplit.dispersion <- function(date, geometry, height, duration_hour, met_type, timezone="UTC"){
+hysplit.dispersion <- function(date, geometry, height, duration_hour, met_type, direction="backward", timezone="UTC"){
 
   dir_hysplit_met <- Sys.getenv("DIR_HYSPLIT_MET", here::here(utils.get_cache_folder("weather")))
   dir_hysplit_output <- file.path(tempdir(), substr(uuid::UUIDgenerate(),1,6)) # Important so that several computations can be ran simultaneously!!
@@ -209,8 +214,15 @@ hysplit.dispersion <- function(date, geometry, height, duration_hour, met_type, 
 
     start_sampling = date_utc
     end_sampling = date_utc + lubridate::hours(duration_sampling)
-    end_simulation = end_sampling
-    start_simulation = start_sampling - lubridate::hours(duration_hour)
+
+    if(direction=='backward'){
+      end_simulation = end_sampling
+      start_simulation = start_sampling - lubridate::hours(duration_hour)
+    }else{
+      start_simulation = start_sampling
+      end_simulation = end_sampling + lubridate::hours(duration_hour)
+    }
+
 
     dispersion_model <-
       splitr::create_dispersion_model() %>%
@@ -235,9 +247,9 @@ hysplit.dispersion <- function(date, geometry, height, duration_hour, met_type, 
         start_time = start_simulation, #Trace them back for n hours
         #not the real end_time since we're going backward: end-start will be used and retracted to start in splitr
         end_time = end_simulation,
-        direction = "backward", #When using backward, duration will have a minus sign in front.
+        direction = direction, #When using backward, duration will have a minus sign in front.
         met_type = met_type,
-        met_dir =dir_hysplit_met,
+        met_dir = dir_hysplit_met,
         exec_dir = dir_hysplit_output,
         clean_up = F
       ) %>%

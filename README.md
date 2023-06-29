@@ -34,4 +34,9 @@ If trajectories returned are empty:
 - check paths are absolute and without ~
 - `sudo apt-get install libgfortran3`
 
+#### Protobuf
 
+If you're facing `google/protobuf/port_def.inc: No such file or directory`:
+```bash
+conda install protobuf=3.10.1
+```
