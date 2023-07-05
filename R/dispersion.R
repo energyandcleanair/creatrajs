@@ -246,6 +246,8 @@ hysplit.dispersion <- function(date, geometry, height, duration_hour, met_type, 
         pdiam = 0.8, # particle diameter in µm
         density = 2, #g/cm3
         shape_factor = 0.8,
+
+
       ) %>%
       splitr::add_dispersion_params(
         start_time = start_simulation, #Trace them back for n hours
