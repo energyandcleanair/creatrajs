@@ -225,6 +225,13 @@ test_that("attaching fire with split_regions", {
     mtf_0_sf <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=F, split_regions="gadm_0", parallel=F, sf_or_sp = "sf")
   })
   toc()
+
+  tic()
+  profvis({
+    mtf_0_sf <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=F, split_regions="gadm_0", adm_res='high', parallel=F, sf_or_sp = "sf")
+  })
+  toc()
+
   tic()
   profvis({
     mtf_0_sp <- creatrajs::fire.attach_to_trajs(mt, buffer_km=buffer_km, split_days=F, split_regions="gadm_0", parallel=F, sf_or_sp = "sp")

@@ -87,7 +87,6 @@ trajs.compute <- function(
                 debug=debug)},
       l$id, l$geometry) %>%
     do.call(dplyr::bind_rows, .)
-
 }
 
 
