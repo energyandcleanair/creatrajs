@@ -29,7 +29,8 @@ Imports:
     exactextractr,
     here,
     splitr,
-    mongolite
+    mongolite,
+    glue
 Depends:
     ggplot2,
     ggmap

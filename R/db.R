@@ -76,7 +76,7 @@ db.upload_trajs <- function(trajs,
     print("Trajs already exist. Replacing them")
     fs$remove(paste0("id:", found$id))
   }
-
+  print(glue("Uploading: ", metadata))
   # And then upload
   fs$upload(filepath, name=basename(filepath), content_type=NULL,
             metadata=jsonlite::toJSON(metadata, auto_unbox=T))
