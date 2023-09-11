@@ -136,6 +136,10 @@ dispersion.get <- function(dates,
 }
 
 
+#' @return cache file name
+#' @export
+#'
+#' @examples
 dispersion.cache_filename <- function(location_id, met_type, height, duration_hour, date, extension){
   paste("dispersion",
         tolower(location_id),
