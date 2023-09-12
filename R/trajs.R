@@ -85,7 +85,7 @@ trajs.compute <- function(
                 parallel=parallel,
                 mc.cores=mc.cores,
                 debug=debug)},
-      l$id, l["geometry"]) %>%
+      l$id, l$geometry) %>%
     do.call(dplyr::bind_rows, .)
 
 }
@@ -124,6 +124,9 @@ trajs.get <- function(dates,
 
   # Edge case with India: HYSPLIT doesn't like non-integer hours offset
   if(timezone=="Asia/Kolkata") timezone <- "Asia/Lahore"
+
+  # Reconvert geometry to sf (e.g. mapply will convert it back to a simple point)
+  geometry <- sf::st_geometry(geometry)
 
   # Row by row
   trajs.get.one <- function(date,
@@ -252,7 +255,7 @@ trajs.get <- function(dates,
     print("Done")
   }
 
-  trajs<- mapply_(
+  trajs <- mapply_(
     trajs.get.one,
     date=dates,
     location_id=location_id,
