@@ -122,7 +122,7 @@ trajs.get <- function(dates,
 
 
   # Edge case with India: HYSPLIT doesn't like non-integer hours offset
-  if(timezone=="Asia/Kolkata") timezone <- "Asia/Lahore"
+  if(all(timezone=="Asia/Kolkata")) timezone <- "Asia/Lahore"
 
   # Reconvert geometry to sf (e.g. mapply will convert it back to a simple point)
   geometry <- sf::st_geometry(geometry)
