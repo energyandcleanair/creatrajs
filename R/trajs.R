@@ -216,6 +216,7 @@ trajs.get <- function(dates,
         )
 
         if(!all(is.na(t_cache))) return(t_cache)
+        print("No cache found, recomputing")
       }
 
 
