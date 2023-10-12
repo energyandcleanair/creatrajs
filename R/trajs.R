@@ -166,6 +166,11 @@ trajs.get <- function(dates,
       return(NA)
     }
 
+    if(length(cache_incomplete) != 0){
+      print("DEBUGGGG2")
+      print(t)
+    }
+
     t <- tryCatch({
       if (cache_incomplete) {
         print(glue('Cached trajectory exists but is incomplete. Recomputing {date}'))
