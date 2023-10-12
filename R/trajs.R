@@ -313,6 +313,10 @@ trajs.get <- function(dates,
     debug=debug,
     SIMPLIFY=F)
 
+  if(complete_only){
+    trajs <- trajs[unlist(lapply(trajs, trajs.is_complete, duration_hour=duration_hour))]
+  }
+
   return(trajs)
 }
 
