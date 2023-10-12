@@ -204,7 +204,7 @@ trajs.get <- function(dates,
           recompute_if_incomplete=recompute_if_incomplete
         )
 
-        if(!is.na(t_cache)) return(t_cache)
+        if(!all(is.na(t_cache))) return(t_cache)
       }
 
 
