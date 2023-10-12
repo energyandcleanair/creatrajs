@@ -148,7 +148,7 @@ trajs.get <- function(dates,
     )
 
     # Return early if nothing is found or if multiple rows are found.
-    if (is.null(found) || nrow(found) != 1) return(NULL)
+    if (is.null(found) || nrow(found) != 1) return(NA)
 
     t <- found$trajs[[1]]
 
@@ -163,12 +163,12 @@ trajs.get <- function(dates,
 
     if (cache_empty) {
       print(glue('Cached trajectory exists but is empty. Recomputing {date}'))
-      return(NULL)
+      return(NA)
     }
 
     if (cache_incomplete) {
       print(glue('Cached trajectory exists but is incomplete. Recomputing {date}'))
-      return(NULL)
+      return(NA)
     }
 
     return(t)
@@ -204,7 +204,7 @@ trajs.get <- function(dates,
           recompute_if_incomplete=recompute_if_incomplete
         )
 
-        if(!is.null(t_cache)) return(t_cache)
+        if(!is.na(t_cache)) return(t_cache)
       }
 
 
