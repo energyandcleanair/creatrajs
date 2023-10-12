@@ -152,4 +152,46 @@ db.download_trajs <- function(location_id=NULL, met_type=NULL, height=NULL, dura
   tibble(result)
 }
 
+#' Remove trajs whose parameters differ from given parameters
+#'
+#' @param location_id
+#' @param hours
+#' @param format
+#'
+#' @return
+#' @export
+#'
+#' @examples
+db.remove_trajs <- function(location_id=NULL, hours=NULL, duration_hour=NULL, format="rds"){
+  fs <- db.get_gridfs()
+  found <- db.find_trajs(location_id=location_id, hours=hours, format=format)
+  to_remove <- c()
+
+  if(~is.null(hours)){
+    hours <- lapply(found$metadata, function(x) tryCatch({jsonlite::fromJSON(x)$hours}, error=function(e){return(NA)}))
+    hours <- lapply(hours, function(x){if(is.null(x)) NA else x})
+    found$hours <- unlist(hours)
+    hours_str <- if(!is.character(hours)) paste0(hours, collapse=",") else hours
+    to_remove_hours <- found %>%
+      filter(hours != !!hours_str) %>%
+      pull(id)
+
+    to_remove <- c(to_remove, to_remove_hours)
+  }
+
+  if(~is.null(duration_hour)){
+    duration_hour <- lapply(found$metadata, function(x) tryCatch({jsonlite::fromJSON(x)$duration_hour}, error=function(e){return(NA)}))
+    duration_hour <- lapply(duration_hour, function(x){if(is.null(x)) NA else x})
+    found$duration_hour <- unlist(duration_hours)
+
+    to_remove_duration_hour <- found %>%
+      filter(duration_hour != !!duration_hour) %>%
+      pull(id)
+
+    to_remove <- c(to_remove, to_remove_duration_hour)
+  }
+
+  if(length(to_remove) >0) fs$remove(paste0("id:", to_remove))
+  print(sprintf("%d row(s) removed", to_remove))
+}
 
