@@ -305,7 +305,8 @@ trajs.get <- function(dates,
     SIMPLIFY=F)
 
   if(complete_only){
-    trajs <- trajs[unlist(lapply(trajs, trajs.is_complete, duration_hour=duration_hour, hours=hours))]
+    complete <- unlist(lapply(trajs, trajs.is_complete, duration_hour=duration_hour, hours=hours))
+    trajs[!complete] <- NA
   }
 
   return(trajs)
