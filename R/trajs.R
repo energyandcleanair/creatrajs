@@ -327,6 +327,7 @@ trajs.get <- function(dates,
 #'
 #' @examples
 trajs.is_complete <- function(trajs, duration_hours){
+  if(is.null(trajs) || nrow(trajs) ==0) return(FALSE)
   all(trajs %>%
         group_by(run) %>%
         summarise(hour_along=-min(hour_along)) %>%
