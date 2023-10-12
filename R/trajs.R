@@ -166,10 +166,16 @@ trajs.get <- function(dates,
       return(NA)
     }
 
-    if (cache_incomplete) {
-      print(glue('Cached trajectory exists but is incomplete. Recomputing {date}'))
-      return(NA)
-    }
+    t <- tryCatch({
+      if (cache_incomplete) {
+        print(glue('Cached trajectory exists but is incomplete. Recomputing {date}'))
+        return(NA)
+      }
+    }, error=function(e){
+      print("DEBUGGGG")
+      print(t)
+      return(t)
+    })
 
     return(t)
 
@@ -322,7 +328,7 @@ trajs.get <- function(dates,
 #'
 #' @examples
 trajs.is_complete <- function(trajs, duration_hours){
-  if(is.null(trajs) || all(is.na(trajs)) || nrow(trajs) ==0) return(FALSE)
+  if(all(is.null(trajs)) || all(is.na(trajs)) || nrow(trajs) ==0) return(FALSE)
   all(trajs %>%
         group_by(run) %>%
         summarise(hour_along=-min(hour_along)) %>%
