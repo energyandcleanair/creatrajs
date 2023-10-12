@@ -118,6 +118,7 @@ trajs.get <- function(dates,
                       parallel=F,
                       mc.cores=max(parallel::detectCores()-1,1),
                       debug=F,
+                      complete_only=T,
                       ...){
 
 
@@ -127,8 +128,55 @@ trajs.get <- function(dates,
   # Reconvert geometry to sf (e.g. mapply will convert it back to a simple point)
   geometry <- sf::st_geometry(geometry)
 
+
+  trajs.get_cache <- function(location_id,
+                  met_type,
+                  date,
+                  height,
+                  duration_hour,
+                  hours,
+                  recompute_if_cache_na,
+                  recompute_if_incomplete){
+
+    found <- db.download_trajs(
+      location_id = location_id,
+      met_type = met_type,
+      date = date,
+      height = height,
+      duration_hour,
+      hours = hours
+    )
+
+    # Return early if nothing is found or if multiple rows are found.
+    if (is.null(found) || nrow(found) != 1) return(NULL)
+
+    t <- found$trajs[[1]]
+
+    # Rename 'date' column if it exists.
+    if ("date" %in% names(t)) {
+      t <- t %>% rename(date_recept = date)
+    }
+
+    # Conditions to determine if re-computation is necessary.
+    cache_empty <- (nrow(t) <= 1 && recompute_if_cache_na)
+    cache_incomplete <- (recompute_if_incomplete && !trajs.is_complete(t, duration_hours = duration_hour))
+
+    if (cache_empty) {
+      print('Cached trajectory exists but is empty. Recomputing')
+      return(NULL)
+    }
+
+    if (cache_incomplete) {
+      print('Cached trajectory exists but is incomplete. Recomputing')
+      return(NULL)
+    }
+
+    return(t)
+
+  }
+
   # Row by row
-  trajs.get.one <- function(date,
+  trajs.get_one <- function(date,
                             location_id,
                             geometry,
                             met_type,
@@ -139,30 +187,26 @@ trajs.get <- function(dates,
                             use_cache,
                             save_to_cache,
                             debug,
-                            recompute_if_cache_na=T){
+                            recompute_if_cache_na=T,
+                            recompute_if_incomplete=T){
     tryCatch({
 
+      # Check in cache if it exists
       if(use_cache){
-        found <- db.download_trajs(location_id=location_id,
-                                   met_type=met_type,
-                                   date=date,
-                                   height=height,
-                                   duration_hour,
-                                   hours=hours)
+        t_cache <- trajs.get_cache(
+          location_id=location_id,
+          met_type=met_type,
+          date=date,
+          height=height,
+          duration_hour=duration_hour,
+          hours=hours,
+          recompute_if_cache_na=recompute_if_cache_na,
+          recompute_if_incomplete=recompute_if_incomplete
+        )
 
-        if(!is.null(found) && nrow(found)==1){
-          t <- found$trajs[[1]]
-          if("date" %in% names(t)){
-            t <- t %>% rename(date_recept=date)
-          }
-
-          if(nrow(t)<=1 & recompute_if_cache_na){
-            print('Cached trajectory exists but is empty. Recomputing')
-          }else{
-            return(t)
-          }
-        }
+        if(!is.null(t_cache)) return(t_cache)
       }
+
 
       # Compute trajs
       t <- hysplit.trajs(date=date,
@@ -255,7 +299,7 @@ trajs.get <- function(dates,
   }
 
   trajs <- mapply_(
-    trajs.get.one,
+    trajs.get_one,
     date=dates,
     location_id=location_id,
     geometry=geometry,
@@ -272,6 +316,22 @@ trajs.get <- function(dates,
   return(trajs)
 }
 
+
+#' Indicates whether a trajectory dataframe is complete or not.
+#'
+#' @param trajs
+#' @param duration_hours
+#'
+#' @return
+#' @export
+#'
+#' @examples
+trajs.is_complete <- function(trajs, duration_hours){
+  all(trajs %>%
+        group_by(run) %>%
+        summarise(hour_along=-min(hour_along)) %>%
+        pull(hour_along) == duration_hours)
+}
 
 
 #' Add a buffer
