@@ -166,7 +166,7 @@ trajs.get <- function(dates,
       return(NA)
     }
 
-    if(length(cache_incomplete) != 0){
+    if(length(cache_incomplete) != 1){
       print("DEBUGGGG2")
       print(t)
     }
