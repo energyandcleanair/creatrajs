@@ -159,7 +159,7 @@ trajs.get <- function(dates,
 
     # Conditions to determine if re-computation is necessary.
     cache_empty <- (nrow(t) <= 1 && recompute_if_cache_na)
-    cache_incomplete <- (recompute_if_incomplete && !trajs.is_complete(t, duration_hours = duration_hour))
+    cache_incomplete <- (recompute_if_incomplete && !trajs.is_complete(t, duration_hours = duration_hour, hours=hours))
 
     if (cache_empty) {
       print(glue('Cached trajectory exists but is empty. Recomputing {date}'))
