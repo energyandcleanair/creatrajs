@@ -71,7 +71,7 @@ trajs.compute <- function(
 
     # Compute trajs
     # Looping over l rows
-    mapply(function(location_id, geometry){
+    trajs <- mapply(function(location_id, geometry){
       trajs.get(dates=dates,
                 location_id=location_id,
                 geometry=geometry,
@@ -85,8 +85,10 @@ trajs.compute <- function(
                 parallel=parallel,
                 mc.cores=mc.cores,
                 debug=debug)},
-      l$id, l$geometry) %>%
-    do.call(dplyr::bind_rows, .)
+      l$id, l$geometry, SIMPLIFY=F, USE.NAMES = F) %>%
+      unlist(recursive = F)
+
+    do.call(rbind, trajs[!is.na(trajs)])
 }
 
 
