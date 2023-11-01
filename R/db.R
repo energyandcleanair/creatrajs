@@ -164,10 +164,10 @@ db.download_trajs <- function(location_id=NULL, met_type=NULL, height=NULL, dura
 #' @examples
 db.remove_trajs <- function(location_id=NULL, hours=NULL, duration_hour=NULL, format="rds"){
   fs <- db.get_gridfs()
-  found <- db.find_trajs(location_id=location_id, hours=hours, format=format)
+  found <- db.find_trajs(location_id=location_id)
   to_remove <- c()
 
-  if(~is.null(hours)){
+  if(!is.null(hours)){
     hours <- lapply(found$metadata, function(x) tryCatch({jsonlite::fromJSON(x)$hours}, error=function(e){return(NA)}))
     hours <- lapply(hours, function(x){if(is.null(x)) NA else x})
     found$hours <- unlist(hours)
@@ -179,7 +179,7 @@ db.remove_trajs <- function(location_id=NULL, hours=NULL, duration_hour=NULL, fo
     to_remove <- c(to_remove, to_remove_hours)
   }
 
-  if(~is.null(duration_hour)){
+  if(!is.null(duration_hour)){
     duration_hour <- lapply(found$metadata, function(x) tryCatch({jsonlite::fromJSON(x)$duration_hour}, error=function(e){return(NA)}))
     duration_hour <- lapply(duration_hour, function(x){if(is.null(x)) NA else x})
     found$duration_hour <- unlist(duration_hours)
@@ -191,7 +191,7 @@ db.remove_trajs <- function(location_id=NULL, hours=NULL, duration_hour=NULL, fo
     to_remove <- c(to_remove, to_remove_duration_hour)
   }
 
-  if(length(to_remove) >0) fs$remove(paste0("id:", to_remove))
+  if(length(to_remove) >0) pbapply::pblapply(to_remove, function(x) fs$remove(paste0("id:", x)))
   print(sprintf("%d row(s) removed", to_remove))
 }
 
