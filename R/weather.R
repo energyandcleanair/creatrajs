@@ -49,11 +49,11 @@ remove_incomplete_gdas1 <- function(){
 
   to_remove <- infos %>%
     filter(is.na(valid) | !valid) %>%
-    pull(path)
+    pull(filepath)
 
   if(length(to_remove) > 0){
     print(glue("Removing {length(to_remove)} gdas1 weather files"))
-    file.remove(infos$filepath)
+    file.remove(to_remove)
   }
 }
 
