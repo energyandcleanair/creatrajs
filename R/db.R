@@ -44,7 +44,13 @@ db.setup_db <- function(){
 
 
 db.upload_trajs <- function(trajs,
-                            location_id, met_type, height, duration_hour, hours, date){
+                            location_id,
+                            met_type,
+                            height,
+                            duration_hour,
+                            hours,
+                            date,
+                            silent=T){
 
 
   # Check format
@@ -73,7 +79,7 @@ db.upload_trajs <- function(trajs,
   names(filter) <- paste0("metadata.", names(filter))
   found <- fs$find(jsonlite::toJSON(filter,auto_unbox=T))
   if(nrow(found)>0){
-    print("Trajs already exist. Replacing them")
+    if(!silent) print("Trajs already exist. Replacing them")
     fs$remove(paste0("id:", found$id))
   }
   # And then upload
