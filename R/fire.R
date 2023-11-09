@@ -284,7 +284,7 @@ fire.attach_to_trajs <- function(mt, buffer_km=10, delay_hour=24,
                warning("Didn't find any fire.")
                mtf_chunk$fires <- list(tibble())
              }else{
-               mtf_chunk$fires <- mapply(
+               mtf_chunk$fires <- pbapply::pbmapply(
                  fire.attach_to_trajs_run,
                  date_fire=mtf_chunk$date_fire,
                  extent=mtf_chunk$extent,
@@ -351,6 +351,7 @@ fire.attach_to_trajs_run <- function(date_fire,
                                      delay_hour=24,
                                      split_region_sp=NULL){
 
+  print(date_fire)
   if(nrow(fires)==0){
     return(tibble(fire_frp=0, fire_count=0))
   }
@@ -384,6 +385,7 @@ fire.attach_to_trajs_run <- function(date_fire,
 
 
   if(nrow(filtered_fires)==0){
+    print(sprintf("No fire found in extent for date %s", date_fire))
     return(tibble(fire_frp=0, fire_count=0))
   }
 
