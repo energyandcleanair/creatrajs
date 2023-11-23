@@ -59,6 +59,11 @@ trajs.compute <- function(
       }
     }
 
+    # Clean met files
+    if(met_type == 'gdas1'){
+      remove_incomplete_gdas1()
+    }
+
     l <- rcrea::locations(level=aggregate_level,
                           city=city,
                           source=source,

@@ -51,6 +51,26 @@ remove_incomplete_gdas1 <- function(){
     filter(is.na(valid) | !valid) %>%
     pull(filepath)
 
+  # Look for those whose modification time doesn't match
+  buffer_days = 2
+  infos <- infos %>%
+    mutate(date = str_extract(filename, "[a-z]{3}[0-9]{2}"),
+           date = as.Date(paste0("01",date), format="%d%b%y"),
+           #extract the week number only
+           weekn = gsub("\\.w", "", str_extract(filename, "\\.w[0-9]{1}"))) %>%
+    mutate(
+      date_expected=pmin(
+        date + lubridate::days(7 * as.numeric(weekn) + buffer_days),
+        lubridate::floor_date(date + lubridate::days(31), "month") + lubridate::days(buffer_days)
+      )
+    )
+
+  to_remove <- unique(c(to_remove,
+                 infos %>%
+                   filter(lubridate::date(ctime) < lubridate::date(date_expected),
+                          !grepl("current7days", filepath)) %>%
+                   pull(filepath)))
+
   if(length(to_remove) > 0){
     print(glue("Removing {length(to_remove)} gdas1 weather files"))
     file.remove(to_remove)
