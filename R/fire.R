@@ -349,9 +349,9 @@ fire.attach_to_trajs_run <- function(date_fire,
                                      extent,
                                      fires,
                                      delay_hour=24,
-                                     split_region_sp=NULL){
+                                     split_region_sp=NULL,
+                                     debug=F){
 
-  print(date_fire)
   if(nrow(fires)==0){
     return(tibble(fire_frp=0, fire_count=0))
   }
@@ -385,7 +385,7 @@ fire.attach_to_trajs_run <- function(date_fire,
 
 
   if(nrow(filtered_fires)==0){
-    print(sprintf("No fire found in extent for date %s", date_fire))
+    if(debug) print(sprintf("No fire found in extent for date %s", date_fire))
     return(tibble(fire_frp=0, fire_count=0))
   }
 
