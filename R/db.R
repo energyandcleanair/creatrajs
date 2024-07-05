@@ -188,7 +188,7 @@ db.remove_trajs <- function(location_id=NULL, hours=NULL, duration_hour=NULL, fo
   if(!is.null(duration_hour)){
     duration_hour <- lapply(found$metadata, function(x) tryCatch({jsonlite::fromJSON(x)$duration_hour}, error=function(e){return(NA)}))
     duration_hour <- lapply(duration_hour, function(x){if(is.null(x)) NA else x})
-    found$duration_hour <- unlist(duration_hours)
+    found$duration_hour <- unlist(duration_hour)
 
     to_remove_duration_hour <- found %>%
       filter(duration_hour != !!duration_hour) %>%
