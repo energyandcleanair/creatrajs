@@ -103,7 +103,7 @@ db.find_trajs <- function(location_id, met_type=NULL, height=NULL, duration_hour
                    metadata.format=format)
 
   filter <- filter[!unlist(lapply(filter, is.null))]
-  fs$find(jsonlite::toJSON(filter,auto_unbox=T))
+  fs$find(jsonlite::toJSON(filter, auto_unbox=T))
 }
 
 
@@ -193,9 +193,11 @@ db.remove_trajs <- function(location_id=NULL, hours=NULL, duration_hour=NULL, fo
   }
 
   if(!is.null(duration_hour)){
-    duration_hour <- lapply(found$metadata, function(x) tryCatch({jsonlite::fromJSON(x)$duration_hour}, error=function(e){return(NA)}))
-    duration_hour <- lapply(duration_hour, function(x){if(is.null(x)) NA else x})
-    found$duration_hour <- unlist(duration_hour)
+
+    found$duration_hour <- sapply(found$metadata, function(x) {
+      duration <- tryCatch(jsonlite::fromJSON(x)$duration_hour, error = function(e) NA)
+      if (is.null(duration)) NA else duration
+    })
 
     to_remove_duration_hour <- found %>%
       filter(duration_hour != !!duration_hour) %>%
