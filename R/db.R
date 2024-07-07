@@ -112,8 +112,15 @@ db.remove_trajs <- function(location_id, met_type=NULL, height=NULL, duration_ho
   found <- db.find_trajs(location_id=location_id, met_type=met_type, height=height,
                          duration_hour=duration_hour, date=date, hours=hours, format=format)
 
-  if(nrow(found)>0) fs$remove(paste0("id:", found$id))
-  print(sprintf("%d row(s) removed", nrow(found)))
+  n_found <- nrow(found)
+
+  if(n_found == 0){
+    print("No matching record found")
+  }else{
+    print(glue("Removing {n_found} records"))
+    fs$remove(paste0("id:", found$id))
+    print("Done")
+  }
 }
 
 
