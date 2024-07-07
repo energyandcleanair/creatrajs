@@ -175,7 +175,7 @@ db.download_trajs <- function(location_id=NULL, met_type=NULL, height=NULL, dura
 #' @export
 #'
 #' @examples
-db.remove_trajs <- function(location_id=NULL, hours=NULL, duration_hour=NULL, format="rds"){
+db.remove_trajs_not <- function(location_id=NULL, hours_not=NULL, duration_hour_not=NULL, format="rds"){
   fs <- db.get_gridfs()
   found <- db.find_trajs(location_id=location_id)
   to_remove <- c()
