@@ -26,10 +26,9 @@ fire.download <- function(date_from=NULL, date_to=NULL, region="Global"){
     return(NULL)
   }
 
-  date_from <- max(lubridate::date(date_from), lubridate::date("2020-01-01"))
-  # Data not available in repository before that
-  # Have been downloaded manually prior 2020
-  # https://firms.modaps.eosdis.nasa.gov/download/
+  # Onle last 60 days available
+  date_from <- max(lubridate::date(date_from), lubridate::today()-lubridate::days(60))
+
   if(date_to >= date_from){
     files.all <- paste0("SUOMI_VIIRS_C2_",
                         region,
