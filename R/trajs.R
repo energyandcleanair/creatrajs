@@ -271,7 +271,7 @@ trajs.get <- function(dates,
       available <- tibble(location_id=location_id, date=dates, height=height)
       available_l <- split(available, paste(available$location_id, available$height, sep="_"))
       available <- lapply(available_l, function(l){
-        available_dates_height <- db.available_dates(location_id=unique(location_id),
+        available_dates_height <- db.available_dates(location_id=unique(l$location_id),
                            met_type=met_type,
                            duration_hour=duration_hour,
                            height=unique(l$height),
