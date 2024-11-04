@@ -52,7 +52,7 @@ db.upload_trajs <- function(trajs,
                             date,
                             silent=T){
 
-
+  print(glue("Uploading trajs ({nrow(trajs)} rows) for {location_id}"))
   # Check format
   ok <- T
   ok <- ok & is.data.frame(trajs)

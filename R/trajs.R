@@ -241,10 +241,6 @@ trajs.get <- function(dates,
                         )
       }
 
-      if(debug){
-        message("Memory used: ", round(pryr::mem_used()/1E6),"MB")
-      }
-
       return(t)
       }, error=function(c){
         print(c)
