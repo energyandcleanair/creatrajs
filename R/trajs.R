@@ -129,6 +129,8 @@ trajs.get <- function(dates,
                       ...){
 
 
+  message("Computing trajs for ", location_id, " from ", min(dates), " to ", max(dates))
+
   # Edge case with India: HYSPLIT doesn't like non-integer hours offset
   if(all(timezone=="Asia/Kolkata")) timezone <- "Asia/Lahore"
 
@@ -226,6 +228,7 @@ trajs.get <- function(dates,
       )
 
       if(length(t)==0 || (length(t)==1 && is.na(t))){
+        message("No trajectories computed for ", location_id, " on ", date)
         return(NA)
       }
 
