@@ -53,6 +53,7 @@ remove_incomplete_gdas1 <- function(){
 
   # Look for those whose modification time doesn't match
   buffer_days = 2
+  delay_before_redownloading_hour <- 2
   infos <- infos %>%
     mutate(date = str_extract(filename, "[a-z]{3}[0-9]{2}"),
            date = as.Date(paste0("01",date), format="%d%b%y"),
@@ -68,6 +69,8 @@ remove_incomplete_gdas1 <- function(){
   to_remove <- unique(c(to_remove,
                  infos %>%
                    filter(lubridate::date(ctime) < lubridate::date(date_expected),
+                          # Not updated in the past hour
+                          ctime < Sys.time() - lubridate::hours(delay_before_redownloading_hour),
                           !grepl("current7days", filepath)) %>%
                    pull(filepath)))
 
