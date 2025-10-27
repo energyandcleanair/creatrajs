@@ -272,36 +272,35 @@ trajs.get <- function(dates,
       pbapply::pbmapply
     }
 
-  # If parallel, we download met files first to avoid concurrency conflict
-  if(parallel){
-    if(use_cache){
-      available <- tibble(location_id=location_id, date=dates, height=height)
-      available_l <- split(available, paste(available$location_id, available$height, sep="_"))
-      available <- lapply(available_l, function(l){
-        available_dates_height <- db.available_dates(location_id=unique(l$location_id),
-                           met_type=met_type,
-                           duration_hour=duration_hour,
-                           height=unique(l$height),
-                           hours=hours)
-        l %>% rowwise() %>% mutate(is.available=date %in% available_dates_height)
-      }) %>% do.call(bind_rows, .)
+  # Download met files first to avoid concurrency conflict
+  # and also as hysplit.trajs seems to only work the second time you run it
+  # for recent dates (something to do with current7days file)
+  if(use_cache){
+    available <- tibble(location_id=location_id, date=dates, height=height)
+    available_l <- split(available, paste(available$location_id, available$height, sep="_"))
+    available <- lapply(available_l, function(l){
+      available_dates_height <- db.available_dates(location_id=unique(l$location_id),
+                         met_type=met_type,
+                         duration_hour=duration_hour,
+                         height=unique(l$height),
+                         hours=hours)
+      l %>% rowwise() %>% mutate(is.available=date %in% available_dates_height)
+    }) %>% do.call(bind_rows, .)
 
 
-      available_dates <- available %>% filter(is.available) %>% pull(date)
-      missing_dates <- available %>% filter(!is.available) %>% pull(date)
-      print(sprintf("Found %d available in cache. %d still missing",
-                    length(available_dates),
-                    length(missing_dates)))
-    }else{
-      missing_dates <- dates
-    }
-
-    # Weather data
-    download_weather(met_type=met_type,
-                     dates=missing_dates,
-                     duration_hour=duration_hour)
-    print("Done")
+    available_dates <- available %>% filter(is.available) %>% pull(date)
+    missing_dates <- available %>% filter(!is.available) %>% pull(date)
+    print(sprintf("Found %d available in cache. %d still missing",
+                  length(available_dates),
+                  length(missing_dates)))
+  }else{
+    missing_dates <- dates
   }
+
+  # Weather data
+  download_weather(met_type=met_type,
+                   dates=missing_dates,
+                   duration_hour=duration_hour)
 
   trajs <- mapply_(
     trajs.get_one,
