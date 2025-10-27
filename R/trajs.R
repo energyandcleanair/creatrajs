@@ -29,7 +29,7 @@ trajs.compute <- function(
   height=creatrajs::DEFAULT_HEIGHT,
   duration_hour=creatrajs::DEFAULT_DURATION_HOUR,
   hours=creatrajs::DEFAULT_HOURS,
-  timezone="UTC",
+  timezone=NULL,
   use_cache=T, # If False, will not read cache BUT will try to write in it if upload_to_cache
   save_to_cache=use_cache,
   parallel=F,
@@ -67,8 +67,13 @@ trajs.compute <- function(
     l <- rcrea::locations(level=aggregate_level,
                           city=city,
                           source=source,
-                          with_geometry = T) %>%
-      dplyr::distinct(id, geometry)
+                          with_geometry = T,
+                          with_metadata = T
+                          ) %>%
+      dplyr::distinct(id, geometry, tz=timezone) %>%
+      # Override timezone if specified by user
+      mutate(tz = ifelse(is.null(timezone), tz, timezone)) %>%
+      mutate(tz = ifelse(is.na(tz), "UTC", tz))
 
     dates <- seq(as.POSIXct(date_from, "UTC"),
                 as.POSIXct(date_to, "UTC"),
@@ -76,7 +81,7 @@ trajs.compute <- function(
 
     # Compute trajs
     # Looping over l rows
-    trajs <- mapply(function(location_id, geometry){
+    trajs <- mapply(function(location_id, geometry, tz){
       trajs.get(dates=dates,
                 location_id=location_id,
                 geometry=geometry,
@@ -84,13 +89,13 @@ trajs.compute <- function(
                 height=height,
                 duration_hour=duration_hour,
                 hours=hours,
-                timezone=timezone,
+                timezone=tz,
                 use_cache=use_cache,
                 save_to_cache=save_to_cache,
                 parallel=parallel,
                 mc.cores=mc.cores,
                 debug=debug)},
-      l$id, l$geometry, SIMPLIFY=F, USE.NAMES = F) %>%
+      l$id, l$geometry, l$tz, SIMPLIFY=F, USE.NAMES = F) %>%
       unlist(recursive = F)
 
     do.call(rbind, trajs[!is.na(trajs)])
@@ -130,6 +135,9 @@ trajs.get <- function(dates,
 
 
   message("Computing trajs for ", location_id, " from ", min(dates), " to ", max(dates))
+
+  # Check that libgfortran is installed (and others?)
+  check_configuration()
 
   # Edge case with India: HYSPLIT doesn't like non-integer hours offset
   if(all(timezone=="Asia/Kolkata")) timezone <- "Asia/Lahore"
