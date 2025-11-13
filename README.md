@@ -25,6 +25,18 @@ EARTHDATA_PWD=
 GDAL_PATH=
 ```
 
+## Download archive fire data
+The script can automatically download recent data from https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/suomi-npp-viirs-c2/.
+
+However this data is only available for the last 60 days. To download older data (e.g. in case the script didn't run for a while, or the token expired),
+go to https://firms.modaps.eosdis.nasa.gov/download/create.php
+
+Select the following options:
+- Region: Global
+- Source: VIIRS S-NPP
+- Format: csv
+
+
 
 
 ### Known Issues
@@ -34,9 +46,20 @@ If trajectories returned are empty:
 - check paths are absolute and without ~
 - `sudo apt-get install libgfortran3`
 
+#### Libgfortran3 not available
+To install `libgfortran3` on Ubuntu 20.04+:
+```bash
+wget http://archive.ubuntu.com/ubuntu/pool/main/g/gcc-5/libgfortran3_5.4.0-6ubuntu1~16.04.12_amd64.deb
+sudo dpkg -i libgfortran3_5.4.0-6ubuntu1~16.04.12_amd64.deb
+
+```
+
+
 #### Protobuf
 
 If you're facing `google/protobuf/port_def.inc: No such file or directory`:
 ```bash
 conda install protobuf=3.10.1
 ```
+
+

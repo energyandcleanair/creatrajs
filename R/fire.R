@@ -175,6 +175,18 @@ fire.read <- function(date_from=NULL,
 }
 
 
+#' This function is used to split downloaded multi-day archive data into daily files
+#'
+#' Data is typically downloaded from https://firms.modaps.eosdis.nasa.gov/download/list.php
+#' and represents fire data over several months (e.g. to fill gaps when the script hadn't been successfully run)
+#'
+#' @param file_archive
+#' @param region
+#'
+#' @returns
+#' @export
+#'
+#' @examples
 fire.split_archive <- function(file_archive, region="Global"){
 
   f <- readr::read_csv(file_archive)
