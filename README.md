@@ -36,6 +36,26 @@ Select the following options:
 - Source: VIIRS S-NPP
 - Format: csv
 
+Once the request is processed, you can use the following script to download, extract and split the data:
+
+```
+# Make sure the firms folder is correct
+stopifnot(creatrajs::utils.get_firms_folder() != "")
+
+
+url <- "https://firms.modaps.eosdis.nasa.gov/data/download/DL_FIRE_SV-C2_685973.zip" # REPLACE WITH YOU URL
+tmp <- tempfile(fileext = ".zip")
+download.file(url, tmp, mode = "wb")
+unzip(tmp, exdir = tempdir())
+list.files(tempdir())
+
+files <- list.files(tempdir(), pattern = "fire_.*.csv$", full.names = TRUE)
+lapply(files, creatrajs::fire.split_archive)
+
+# Empty tmpdir in case you have more than one request
+unlink(list.files(tempdir(), full.names = TRUE))
+
+```
 
 
 
