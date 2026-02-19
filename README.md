@@ -1,4 +1,4 @@
-# creatrajs
+# creatrajs: Trajectories and Fire
 
 R package for computing back-trajectories and dispersions, downloading fire data, attaching fire to trajectories, and caching results in MongoDB.
 
@@ -42,23 +42,28 @@ GDAL_PATH=
 DIR_MODIS=
 ```
 
+
 ## Fire archive data
 
 Near-real-time FIRMS data covers only the **last 60 days**. For older data (e.g. after a token expiry or a gap in runs):
 
 1. Go to https://firms.modaps.eosdis.nasa.gov/download/create.php
+
+
 2. Select: Region = Global, Source = VIIRS S-NPP, Format = CSV
-3. Place downloaded files in `$DIR_FIRMS/suomi-npp-viirs-c2/Global/`
+
+
+3. Get url in received email
+```
+url <- "https://firms.modaps.eosdis.nasa.gov/data/download/DL_FIRE_SV-C2_685973.zip" # REPLACE WITH YOU URL
+```
+
 4. Run `fire.split_archive()` to split multi-day files into daily files
 
-Once the request is processed, you can use the following script to download, extract and split the data:
-
 ```
-# Make sure the firms folder is correct
+# Make sure FIRMS folder is defined
 stopifnot(creatrajs::utils.get_firms_folder() != "")
 
-
-url <- "https://firms.modaps.eosdis.nasa.gov/data/download/DL_FIRE_SV-C2_685973.zip" # REPLACE WITH YOU URL
 tmp <- tempfile(fileext = ".zip")
 download.file(url, tmp, mode = "wb")
 unzip(tmp, exdir = tempdir())
@@ -69,7 +74,6 @@ lapply(files, creatrajs::fire.split_archive)
 
 # Empty tmpdir in case you have more than one request
 unlink(list.files(tempdir(), full.names = TRUE))
-
 ```
 
 ### Known Issues
@@ -81,8 +85,8 @@ If trajectories returned are empty:
 
 #### Libgfortran3 not available
 To install `libgfortran3` on Ubuntu 20.04+:
+
 ```bash
 wget http://archive.ubuntu.com/ubuntu/pool/main/g/gcc-5/libgfortran3_5.4.0-6ubuntu1~16.04.12_amd64.deb
 sudo dpkg -i libgfortran3_5.4.0-6ubuntu1~16.04.12_amd64.deb
-
 ```
