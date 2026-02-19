@@ -1,6 +1,8 @@
 # creatrajs
 
-R package for computing back-trajectories and dispersions, attaching fire observations to them, and caching results in MongoDB. Built on top of [`splitr`](https://github.com/rich-iannone/splitr) (HYSPLIT wrapper).
+R package for computing back-trajectories and dispersions, downloading fire data, attaching fire to trajectories, and caching results in MongoDB.
+
+The trajectory computation leverages [`splitr`](https://github.com/rich-iannone/splitr) (HYSPLIT wrapper).
 
 ## What it does
 
@@ -70,8 +72,6 @@ unlink(list.files(tempdir(), full.names = TRUE))
 
 ```
 
-
-
 ### Known Issues
 
 If trajectories returned are empty:
@@ -86,13 +86,3 @@ wget http://archive.ubuntu.com/ubuntu/pool/main/g/gcc-5/libgfortran3_5.4.0-6ubun
 sudo dpkg -i libgfortran3_5.4.0-6ubuntu1~16.04.12_amd64.deb
 
 ```
-
-
-#### Protobuf
-
-If you're facing `google/protobuf/port_def.inc: No such file or directory`:
-```bash
-conda install protobuf=3.10.1
-```
-
-
