@@ -1,4 +1,25 @@
-utils.modis.init <- function(){
+modis.frp.read <- function(date){
+  tryCatch({
+    # Using the dat format
+    folder1 <- file.path(dir_modis14a1_archive, "MOD14", lubridate::year(date)) #TERRA
+    folder2 <- file.path(dir_modis14a1_archive, "MYD14", lubridate::year(date)) #AQUA
+    pattern <- paste0("M.D14_006_Fire_Table_",lubridate::year(date), sprintf("%03d", lubridate::yday(date)),".dat")
+    f1 <- list.files(folder1, pattern, full.names = T)
+    f2 <- list.files(folder2, pattern, full.names = T)
+
+    d1 <- read.csv(f1, skip = 6)
+    d2 <- read.csv(f2, skip = 6)
+
+    sf1 <- sf::st_as_sf(d1, coords=c("FP_longitude","FP_latitude"), crs=4326)
+    sf2 <- sf::st_as_sf(d2, coords=c("FP_longitude","FP_latitude"), crs=4326)
+
+    rbind(sf1, sf2)
+  },error=function(c){
+    return(NA)
+  })
+}
+
+modis.init <- function(){
   MODIS::MODISoptions(
     localArcPath=Sys.getenv("DIR_MODIS"),
     outDirPath=file.path(Sys.getenv("DIR_MODIS"),"processed"),
@@ -11,7 +32,7 @@ utils.modis.init <- function(){
   }
 }
 
-utils.modis.traj_extent <- function(traj, buffer_km){
+modis.traj_extent <- function(traj, buffer_km){
   tryCatch({
     sf::st_as_sf(traj, coords=c("lon","lat"), crs=4326) %>%
       sf::st_transform(crs=3857) %>%
@@ -23,13 +44,13 @@ utils.modis.traj_extent <- function(traj, buffer_km){
   })
 }
 
-utils.modis.union_extents <- function(l){
+modis.union_extents <- function(l){
   do.call("st_union", as.list(l)) %>%
     st_bbox() %>%
     st_as_sfc()
 }
 
-utils.modis.date_rasters <- function(rasters){
+modis.date_rasters <- function(rasters){
   result <- tibble()
   for(d in names(rasters)){
     date_init <- lubridate::date(names(rasters[d]))
@@ -42,15 +63,15 @@ utils.modis.date_rasters <- function(rasters){
 }
 
 
-utils.modis.geotiffs.old <- function(date_from, date_to, extent, ...){
+modis.geotiffs.old <- function(date_from, date_to, extent, ...){
   extent.sf <- sf::st_as_sf(sf::st_sfc(extent), crs=3857)
   begin=format(date_from,"%Y%j")
   end=format(date_to,"%Y%j")
   rasters <- MODIS::runGdal(job="MOD14A1.day", product="MOD14A1", extent=extent.sf, begin=begin, end=end, SDSstring="0010")[[1]]
-  utils.modis.date_rasters(rasters)
+  modis.date_rasters(rasters)
 }
 
-utils.modis.geotiffs <- function(date_from, date_to, extent, ...){
+modis.geotiffs <- function(date_from, date_to, extent, ...){
 
   dir_processed <- file.path(Sys.getenv("DIR_MODIS"),"modisstp","processed")
   dir_tiff <- file.path(dir_processed, "ThermalAn_Fire_Daily_1Km_v6", "MaxFRP")
@@ -119,7 +140,7 @@ utils.modis.geotiffs <- function(date_from, date_to, extent, ...){
   return(fr)
 }
 
-utils.modis.frp.average <- function(trajs.day, r, buffer_km){
+modis.frp.average <- function(trajs.day, r, buffer_km){
   date <- lubridate::date(trajs.day$traj_dt) %>% unique()
   raster.day <- r %>% filter(date==!!date) %>% pull(raster)
   t <- st_union(st_buffer(st_transform(st_as_sf(trajs.day, coords=c("lon","lat"), crs=4326),crs=3857), buffer_km*1000))
@@ -132,7 +153,7 @@ utils.modis.frp.average <- function(trajs.day, r, buffer_km){
 
 }
 
-utils.modis.frp_at_traj <- function(trajs, country, location_id, ..., frp.rasters, buffer_km){
+modis.frp_at_traj <- function(trajs, country, location_id, ..., frp.rasters, buffer_km){
 
   tryCatch({
     traj.sf <- sf::st_as_sf(trajs, coords=c("lon","lat"), crs=4326) %>%
@@ -144,7 +165,7 @@ utils.modis.frp_at_traj <- function(trajs, country, location_id, ..., frp.raster
       group_by(date=lubridate::date(traj_dt)) %>%
       tidyr::nest(trajs=!date) %>%
       rowwise() %>%
-      mutate(frp=utils.modis.frp.average(trajs,r=r, buffer_km=buffer_km),
+      mutate(frp=modis.frp.average(trajs,r=r, buffer_km=buffer_km),
              count=nrow(trajs))
 
     return(weighted.mean(frp.day$frp, frp.day$count))

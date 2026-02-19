@@ -1,40 +1,53 @@
 # creatrajs
-`creatrajs` is a R package dedicated to calculating trajectories (or dispersion) and performing operation on them. It builds upon `splitr` package.
 
-`creatrajs` also holds a few important **fire-related functions** (downloading fire data from FIRMS, attaching fires to trajectories etc.).
+R package for computing back-trajectories and dispersions, attaching fire observations to them, and caching results in MongoDB. Built on top of [`splitr`](https://github.com/rich-iannone/splitr) (HYSPLIT wrapper).
 
-### Setup
+## What it does
 
-Environment variables required:
-```{bash}
+**Trajectories** (`trajs.R`, `dispersion.R`)
+- Compute HYSPLIT back-trajectories and dispersion models for a set of locations and dates
+- Upload/download trajectories to/from MongoDB GridFS (`db.R`)
+
+**Fire attachment** (`fire.R`, `gfas.R`)
+- Download VIIRS/FIRMS active fire data from EOSDIS (near-real-time, last 60 days) or archive
+- Attach fire observations to trajectories, circular extents, or dispersion rasters
+- Aggregate fire counts/FRP within geographic extents
+
+**MODIS FRP** (`utils.modis.R`) — _experimental, not part of normal workflow_
+- Download and process MODIS Terra/Aqua fire radiative power rasters
+- Requires separate MODIS data directory and EarthData credentials
+
+## Setup
+
+Environment variables:
+```bash
 # Keys
-EOSDIS_TOKEN= # To download FIRMS fire data
-GOOGLE_MAP_API_KEY=
+EOSDIS_TOKEN=        # NASA FIRMS API token (https://firms.modaps.eosdis.nasa.gov/api/area/)
+GOOGLE_MAP_API_KEY=  # For fire heatmap visualisation (optional)
 
 # Directories
-DIR_FIRMS= # Folder where FIRMS data will be downloaded
-DIR_HYSPLIT_MET= # Folder where Hysplit meteorological data will be downloaded
+DIR_FIRMS=           # Local folder for FIRMS fire data
+DIR_HYSPLIT_MET=     # Local folder for HYSPLIT met data
 
-# Google Cloud
+# Google Cloud (for trajectory export via run_and_export.R)
 GCS_DEFAULT_BUCKET=
 GCS_AUTH_FILE=
 
-# For later
+# MODIS (experimental, not used in normal workflow)
 EARTHDATA_USR=
 EARTHDATA_PWD=
 GDAL_PATH=
+DIR_MODIS=
 ```
 
-## Download archive fire data
-The script can automatically download recent data from https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/suomi-npp-viirs-c2/.
+## Fire archive data
 
-However this data is only available for the last 60 days. To download older data (e.g. in case the script didn't run for a while, or the token expired),
-go to https://firms.modaps.eosdis.nasa.gov/download/create.php
+Near-real-time FIRMS data covers only the **last 60 days**. For older data (e.g. after a token expiry or a gap in runs):
 
-Select the following options:
-- Region: Global
-- Source: VIIRS S-NPP
-- Format: csv
+1. Go to https://firms.modaps.eosdis.nasa.gov/download/create.php
+2. Select: Region = Global, Source = VIIRS S-NPP, Format = CSV
+3. Place downloaded files in `$DIR_FIRMS/suomi-npp-viirs-c2/Global/`
+4. Run `fire.split_archive()` to split multi-day files into daily files
 
 Once the request is processed, you can use the following script to download, extract and split the data:
 

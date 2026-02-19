@@ -97,29 +97,6 @@ utils.buffer_km <- function(g, buffer_km){
 #   return(mft)
 # }
 
-utils.frp.read.modis <- function(date){
-  tryCatch({
-    # Using the dat format
-    folder1 <- file.path(dir_modis14a1_archive, "MOD14", lubridate::year(date)) #TERRA
-    folder2 <- file.path(dir_modis14a1_archive, "MYD14", lubridate::year(date)) #AQUA
-    pattern <- paste0("M.D14_006_Fire_Table_",lubridate::year(date), sprintf("%03d", lubridate::yday(date)),".dat")
-    f1 <- list.files(folder1, pattern, full.names = T)
-    f2 <- list.files(folder2, pattern, full.names = T)
-
-    d1 <- read.csv(f1, skip = 6)
-    d2 <- read.csv(f2, skip = 6)
-
-    sf1 <- sf::st_as_sf(d1, coords=c("FP_longitude","FP_latitude"), crs=4326)
-    sf2 <- sf::st_as_sf(d2, coords=c("FP_longitude","FP_latitude"), crs=4326)
-
-    rbind(sf1, sf2)
-  },error=function(c){
-    return(NA)
-  })
-}
-
-
-
 
 utils.attach.frp <- function(mft, buffer_km){
 
@@ -127,7 +104,7 @@ utils.attach.frp <- function(mft, buffer_km){
     t.date <- traj %>% filter(lubridate::date(traj_dt)==lubridate::date(date))
     t.buffered <- st_as_sf(t.date, coords=c("lon","lat"), crs=4326) %>%
       utils.buffer_km(buffer_km)
-    rfp <- utils.frp.read.modis(date)
+    rfp <- modis.frp.read(date)
 
     if(all(is.na(rfp))){
       return(0)
@@ -156,15 +133,15 @@ utils.attach.frp.raster<- function(mft, buffer_km, duration_hour){
 
   mft2 <- mft %>%
     ungroup() %>%
-    mutate(trajs_extent=purrr::map(trajs, utils.modis.traj_extent, buffer_km=buffer_km))
+    mutate(trajs_extent=purrr::map(trajs, modis.traj_extent, buffer_km=buffer_km))
 
   # We're building one geotiff file per date per region
   frp.rasters <- mft2 %>%
     group_by(country, location_id) %>%
-    summarise(extent=utils.modis.union_extents(trajs_extent),
+    summarise(extent=modis.union_extents(trajs_extent),
               date_from=min(date)-lubridate::hours(duration_hour),
               date_to=max(date)) %>%
-    mutate(geotiffs=purrr::pmap(., utils.modis.geotiffs)) %>%
+    mutate(geotiffs=purrr::pmap(., modis.geotiffs)) %>%
     dplyr::select(country, location_id, geotiffs) %>%
     tidyr::unnest(geotiffs) %>%
     rename(fire_raster=raster)
@@ -183,7 +160,7 @@ utils.attach.frp.raster<- function(mft, buffer_km, duration_hour){
 
   # Calculate mean frp along trajectories
   # wtf <- mft2 %>%
-  #   mutate(frp=purrr::pmap_dbl(., utils.modis.frp_at_traj, frp.rasters=frp.rasters, buffer_km=buffer_km))
+  #   mutate(frp=purrr::pmap_dbl(., modis.frp_at_traj, frp.rasters=frp.rasters, buffer_km=buffer_km))
   #
   # wtfd <- wtf %>%
   #   dplyr::select(country, location_id, date, frp) %>%

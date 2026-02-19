@@ -20,7 +20,7 @@
 #' @export
 #'
 #' @examples
-process <- function(city,
+run_and_export <- function(city,
                     source,
                     date_from,
                     poll=c("pm25","pm10"),
