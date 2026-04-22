@@ -574,7 +574,7 @@ resolve_hysplit_binary_path <- function(binary_path=NULL){
 
 hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timezone="UTC", hours=c(0, 6, 12, 18), binary_path=NULL){
 
-  dir_hysplit_met <- Sys.getenv("DIR_HYSPLIT_MET", here::here(utils.get_cache_folder("weather")))
+  dir_hysplit_met <- path.expand(Sys.getenv("DIR_HYSPLIT_MET", here::here(utils.get_cache_folder("weather"))))
   dir_hysplit_output <- file.path(tempdir(), substr(uuid::UUIDgenerate(),1,6)) # Important so that several computations can be ran simultaneously!!
   dir.create(dir_hysplit_output, showWarnings = F, recursive = T)
   lat <- sf::st_coordinates(geometry)[2]

@@ -12,7 +12,7 @@ download_weather <- function(met_type, dates, duration_hour){
     remove_incomplete_gdas1()
   }
 
-  dir_hysplit_met <- Sys.getenv("DIR_HYSPLIT_MET", here::here(utils.get_cache_folder("weather")))
+  dir_hysplit_met <- path.expand(Sys.getenv("DIR_HYSPLIT_MET", here::here(utils.get_cache_folder("weather"))))
   if(length(dates)){
     print(paste("Downloading weather data into", dir_hysplit_met))
     dir.create(dir_hysplit_met, recursive = T, showWarnings = F)
@@ -93,7 +93,7 @@ gdas1_map_current7days_to_week <- function(dir_hysplit_met){
 
 remove_incomplete_gdas1 <- function(){
 
-  dir_hysplit_met <- Sys.getenv("DIR_HYSPLIT_MET", here::here(utils.get_cache_folder("weather")))
+  dir_hysplit_met <- path.expand(Sys.getenv("DIR_HYSPLIT_MET", here::here(utils.get_cache_folder("weather"))))
 
   files <- list.files(path=dir_hysplit_met, pattern='gdas1.*', full.names = T)
   infos <- file.info(files)
