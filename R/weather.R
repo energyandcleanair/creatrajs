@@ -51,7 +51,12 @@ gdas1_read_header_date <- function(filepath){
     return(NA)
   }
 
-  as.Date(sprintf("20%02d-%02d-%02d", yy, mm, dd))
+  year <- if (yy < 100) 2000 + yy else yy
+  parsed <- as.Date(sprintf("%04d-%02d-%02d", year, mm, dd), format = "%Y-%m-%d")
+  if (is.na(parsed)) {
+    return(NA)
+  }
+  parsed
 }
 
 gdas1_filename_from_date <- function(d){
