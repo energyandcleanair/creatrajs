@@ -31,8 +31,18 @@ check_splitr_hyts_binary <- function() {
     return(invisible(TRUE))
   }
 
-  binary_path <- splitr:::set_binary_path(binary_path = NULL, binary_name = "hyts_std")
+  binary_dir <- Sys.getenv("HYSPLIT_BINARY_DIR", "")
+  using_custom_binary <- nzchar(binary_dir)
+  if (using_custom_binary) {
+    binary_path <- file.path(path.expand(binary_dir), "hyts_std")
+  } else {
+    binary_path <- splitr:::set_binary_path(binary_path = NULL, binary_name = "hyts_std")
+  }
+
   if (!file.exists(binary_path)) {
+    if (using_custom_binary) {
+      stop(sprintf("Configured hyts_std binary not found at '%s' (from HYSPLIT_BINARY_DIR).", binary_path))
+    }
     stop(sprintf("splitr hyts_std binary not found at '%s'.", binary_path))
   }
 
@@ -47,13 +57,11 @@ check_splitr_hyts_binary <- function() {
     !any(grepl("arm64|aarch64", file_info, ignore.case = TRUE))
 
   if (is_arm_machine && binary_is_x86_only) {
-    stop(
-      paste(
-        "splitr hyts_std binary is x86_64-only, but this R session is running on Apple Silicon.",
-        "This prevents trajectory execution and can look like '0 trajectories'.",
-        "Run under Rosetta x86_64 R or provide an arm64-compatible HYSPLIT binary via splitr's binary_path."
-      )
-    )
+    warning(paste(
+      sprintf("hyts_std binary at '%s' is x86_64-only, while this R session is Apple Silicon.", binary_path),
+      "Execution may still work through Rosetta translation depending on machine setup.",
+      "If trajectories fail, run x86_64 R via Rosetta or install an arm64-compatible HYSPLIT binary."
+    ))
   }
 
   invisible(TRUE)

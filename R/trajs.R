@@ -33,6 +33,7 @@ trajs.compute <- function(
   timezone=NULL,
   use_cache=T, # If False, will not read cache BUT will try to write in it if upload_to_cache
   save_to_cache=use_cache,
+  binary_path=NULL,
   parallel=F,
   mc.cores=max(parallel::detectCores()-1,1),
   debug=T){
@@ -99,6 +100,7 @@ trajs.compute <- function(
                 timezone=tz,
                 use_cache=use_cache,
                 save_to_cache=save_to_cache,
+                binary_path=binary_path,
                 parallel=parallel,
                 mc.cores=mc.cores,
                 debug=debug)},
@@ -134,6 +136,7 @@ trajs.get <- function(dates,
                       timezone="UTC",
                       use_cache=T, # If False, will not read cache BUT will try to write in it if upload_to_cache
                       save_to_cache=use_cache,
+                      binary_path=NULL,
                       parallel=F,
                       mc.cores=max(parallel::detectCores()-1,1),
                       debug=F,
@@ -209,6 +212,7 @@ trajs.get <- function(dates,
                             hours,
                             use_cache,
                             save_to_cache,
+                            binary_path,
                             debug,
                             recompute_if_cache_na=T,
                             recompute_if_incomplete=T){
@@ -239,7 +243,8 @@ trajs.get <- function(dates,
                          duration_hour=duration_hour,
                          height=height,
                          timezone=timezone,
-                         hours=hours
+                         hours=hours,
+                         binary_path=binary_path
       )
 
       if(length(t)==0 || (length(t)==1 && is.na(t))){
@@ -320,13 +325,17 @@ trajs.get <- function(dates,
     timezone=timezone,
     use_cache=use_cache,
     save_to_cache=save_to_cache,
+    binary_path=list(binary_path),
     hours=list(hours),
     debug=debug,
     SIMPLIFY=F)
 
   if(complete_only){
     complete <- unlist(lapply(trajs, trajs.is_complete, duration_hour=duration_hour, hours=hours))
-    trajs[!complete] <- NA
+    if(length(complete) == 0){
+      return(list())
+    }
+    trajs[is.na(complete) | !complete] <- NA
   }
 
   return(trajs)
@@ -542,7 +551,28 @@ trajs.cache_filename <- function(location_id, met_type, height, duration_hour, h
 }
 
 
-hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timezone="UTC", hours=c(0, 6, 12, 18)){
+resolve_hysplit_binary_path <- function(binary_path=NULL){
+  candidate <- binary_path
+  if (is.null(candidate) || all(is.na(candidate)) || !nzchar(candidate)) {
+    env_candidate <- Sys.getenv("HYSPLIT_BINARY_DIR", "")
+    if (nzchar(env_candidate)) {
+      candidate <- env_candidate
+    }
+  }
+
+  if (is.null(candidate) || all(is.na(candidate)) || !nzchar(candidate)) {
+    return(NULL)
+  }
+
+  candidate <- path.expand(candidate)
+  if (!grepl("/$", candidate)) {
+    candidate <- paste0(candidate, "/")
+  }
+
+  candidate
+}
+
+hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timezone="UTC", hours=c(0, 6, 12, 18), binary_path=NULL){
 
   dir_hysplit_met <- Sys.getenv("DIR_HYSPLIT_MET", here::here(utils.get_cache_folder("weather")))
   dir_hysplit_output <- file.path(tempdir(), substr(uuid::UUIDgenerate(),1,6)) # Important so that several computations can be ran simultaneously!!
@@ -553,6 +583,7 @@ hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timez
   # Build date/hour combinations in UTC
   offset <- as.double(as.POSIXct(date,tz=timezone)-as.POSIXct(date,tz="UTC"), units="hours")
   hours_utc <- hours + round(offset)
+  binary_path <- resolve_hysplit_binary_path(binary_path)
 
   tryCatch({
     trajs <- splitr::hysplit_trajectory(
@@ -565,6 +596,7 @@ hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timez
                                  direction = "backward",
                                  met_type = met_type,
                                  extended_met = F,
+                                 binary_path = binary_path,
                                  met_dir = dir_hysplit_met,
                                  exec_dir = dir_hysplit_output,
                                  clean_up = F)
