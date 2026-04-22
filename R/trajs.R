@@ -134,7 +134,7 @@ trajs.get <- function(dates,
                       ...){
 
 
-  message("Computing trajs for ", location_id, " from ", min(dates), " to ", max(dates))
+  message("Computing trajs for ", unique(location_id), " from ", min(dates), " to ", max(dates))
 
   # Check that libgfortran is installed (and others?)
   check_configuration()
