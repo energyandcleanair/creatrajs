@@ -22,6 +22,7 @@
 trajs.compute <- function(
   source=NULL,
   city=NULL,
+  location_id=NULL,
   aggregate_level="city",
   date_from="2020-01-01",
   date_to=lubridate::today(),
@@ -36,9 +37,9 @@ trajs.compute <- function(
   mc.cores=max(parallel::detectCores()-1,1),
   debug=T){
 
-    # Either source or city should be provided
-    if(is.null(source) & all(is.null(city))){
-      stop("Either source or city should be provided")
+    # Either source, city, or location_id should be provided
+    if(is.null(source) & all(is.null(city)) & all(is.null(location_id))){
+      stop("Either source, city, or location_id should be provided")
     }
 
     # Apply default values (useful when creaengine calls this function with NULL values)
@@ -65,6 +66,7 @@ trajs.compute <- function(
     }
 
     l <- rcrea::locations(level=aggregate_level,
+                          id=location_id,
                           city=city,
                           source=source,
                           with_geometry = T,
@@ -74,6 +76,11 @@ trajs.compute <- function(
       # Override timezone if specified by user
       mutate(tz = ifelse(is.null(timezone), tz, timezone)) %>%
       mutate(tz = ifelse(is.na(tz), "UTC", tz))
+
+    if(nrow(l) == 0){
+      stop(sprintf("No locations found. location_id=%s, city=%s, source=%s.",
+                   paste(location_id, collapse=", "), paste(city, collapse=", "), paste(source, collapse=", ")))
+    }
 
     dates <- seq(as.POSIXct(date_from, "UTC"),
                 as.POSIXct(date_to, "UTC"),
@@ -98,7 +105,7 @@ trajs.compute <- function(
       l$id, l$geometry, l$tz, SIMPLIFY=F, USE.NAMES = F) %>%
       unlist(recursive = F)
 
-    do.call(rbind, trajs[!is.na(trajs)])
+    do.call(rbind, if(is.null(trajs)) list() else trajs[!is.na(trajs)])
 }
 
 
