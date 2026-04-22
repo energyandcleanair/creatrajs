@@ -23,6 +23,65 @@ download_weather <- function(met_type, dates, duration_hour){
       direction = "backward",
       met_dir = dir_hysplit_met
     )
+    if(met_type == "gdas1"){
+      gdas1_map_current7days_to_week(dir_hysplit_met)
+    }
+  }
+}
+
+gdas1_read_header_date <- function(filepath){
+  if(!file.exists(filepath) || file.info(filepath)$size <= 0){
+    return(NA)
+  }
+
+  con <- file(filepath, "rb")
+  on.exit(close(con), add = TRUE)
+  header <- rawToChar(readBin(con, what = "raw", n = 64))
+  header <- gsub("\\s+", " ", trimws(header))
+  tokens <- unlist(strsplit(header, " "))
+
+  if(length(tokens) < 3){
+    return(NA)
+  }
+
+  yy <- suppressWarnings(as.integer(tokens[1]))
+  mm <- suppressWarnings(as.integer(tokens[2]))
+  dd <- suppressWarnings(as.integer(tokens[3]))
+  if(any(is.na(c(yy, mm, dd)))){
+    return(NA)
+  }
+
+  as.Date(sprintf("20%02d-%02d-%02d", yy, mm, dd))
+}
+
+gdas1_filename_from_date <- function(d){
+  if(any(is.na(d))){
+    return(NA_character_)
+  }
+  month_name <- tolower(format(d, "%b"))
+  year_2digit <- format(d, "%y")
+  week_number <- ceiling(as.integer(format(d, "%d")) / 7)
+  paste0("gdas1.", month_name, year_2digit, ".w", week_number)
+}
+
+gdas1_map_current7days_to_week <- function(dir_hysplit_met){
+  current_path <- file.path(dir_hysplit_met, "current7days")
+  current_date <- gdas1_read_header_date(current_path)
+  target_file <- gdas1_filename_from_date(current_date)
+
+  if(is.na(current_date) || is.na(target_file)){
+    return(invisible(NULL))
+  }
+
+  target_path <- file.path(dir_hysplit_met, target_file)
+  target_ok <- file.exists(target_path) && file.info(target_path)$size > 0
+  if(target_ok){
+    return(invisible(NULL))
+  }
+
+  copied <- file.copy(current_path, target_path, overwrite = TRUE)
+  if(copied){
+    print(glue::glue("Mapped current7days to {target_file} from header date {current_date}"))
   }
 }
 
@@ -75,7 +134,7 @@ remove_incomplete_gdas1 <- function(){
                    pull(filepath)))
 
   if(length(to_remove) > 0){
-    print(glue("Removing {length(to_remove)} gdas1 weather files"))
+    print(glue::glue("Removing {length(to_remove)} gdas1 weather files"))
     file.remove(to_remove)
   }
 }
