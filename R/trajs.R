@@ -61,11 +61,6 @@ trajs.compute <- function(
       }
     }
 
-    # Clean met files
-    if(met_type == 'gdas1'){
-      remove_incomplete_gdas1()
-    }
-
     l <- rcrea::locations(level=aggregate_level,
                           id=location_id,
                           city=city,
@@ -87,6 +82,12 @@ trajs.compute <- function(
                 as.POSIXct(date_to, "UTC"),
                 by="1 day")
 
+    # Prepare weather data once for all locations before the loop
+    # (download_weather also handles cleaning incomplete gdas1 files internally)
+    download_weather(met_type = met_type,
+                     dates = dates,
+                     duration_hour = duration_hour)
+
     # Compute trajs
     # Looping over l rows
     trajs <- mapply(function(location_id, geometry, tz){
@@ -103,7 +104,8 @@ trajs.compute <- function(
                 binary_path=binary_path,
                 parallel=parallel,
                 mc.cores=mc.cores,
-                debug=debug)},
+                debug=debug,
+                download_met=FALSE)},
       l$id, l$geometry, l$tz, SIMPLIFY=F, USE.NAMES = F) %>%
       unlist(recursive = F)
 
@@ -141,6 +143,7 @@ trajs.get <- function(dates,
                       mc.cores=max(parallel::detectCores()-1,1),
                       debug=F,
                       complete_only=T,
+                      download_met=T,
                       ...){
 
 
@@ -309,10 +312,12 @@ trajs.get <- function(dates,
     missing_dates <- dates
   }
 
-  # Weather data
-  download_weather(met_type=met_type,
-                   dates=missing_dates,
-                   duration_hour=duration_hour)
+  # Weather data (skipped when called from trajs.compute which downloads once for all locations)
+  if(download_met){
+    download_weather(met_type=met_type,
+                     dates=missing_dates,
+                     duration_hour=duration_hour)
+  }
 
   trajs <- mapply_(
     trajs.get_one,
