@@ -86,9 +86,7 @@ trajs.compute <- function(
                    paste(location_id, collapse=", "), paste(city, collapse=", "), paste(source, collapse=", ")))
     }
 
-    dates <- seq(as.POSIXct(date_from, "UTC"),
-                as.POSIXct(date_to, "UTC"),
-                by="1 day")
+    dates <- seq(as.Date(date_from), as.Date(date_to), by="1 day")
 
     # Prepare weather data once for all locations before the loop
     # (download_weather also handles cleaning incomplete gdas1 files internally)
@@ -613,7 +611,12 @@ hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timez
   binary_path <- resolve_hysplit_binary_path(binary_path)
 
   tryCatch({
-    trajs <- splitr::hysplit_trajectory(
+    # Muffle only the noisy "All formats failed to parse. No formats found." warnings
+    # that splitr::trajectory_read emits when a HYSPLIT trajectory has unparseable
+    # date rows (trajectory truncated because met data ran out). Real signal — i.e.,
+    # trajectory completeness — is handled by trajs.is_complete() downstream.
+    trajs <- withCallingHandlers(
+      splitr::hysplit_trajectory(
                                  lon = lon,
                                  lat = lat,
                                  height = height,
@@ -626,7 +629,13 @@ hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timez
                                  binary_path = binary_path,
                                  met_dir = dir_hysplit_met,
                                  exec_dir = dir_hysplit_output,
-                                 clean_up = F)
+                                 clean_up = F),
+      warning = function(w){
+        if(grepl("All formats failed to parse|No formats found", conditionMessage(w))){
+          invokeRestart("muffleWarning")
+        }
+      }
+    )
 
     # Update fields to be compatible with OpenAIR
     trajs$hour.inc <- trajs$hour_along
