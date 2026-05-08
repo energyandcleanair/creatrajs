@@ -6,7 +6,9 @@ db.get_collection <- function(collection_name){
 
 db.get_gridfs <- function(){
   readRenviron(".Renviron")
-  connection_string=Sys.getenv("CREA_MONGODB_URL")
+  connection_string <- Sys.getenv("CREA_MONGODB_URL")
+  message(sprintf("[DIAG db.get_gridfs] CREA_MONGODB_URL nchar=%d",
+                  nchar(connection_string)))
   mongolite::gridfs(db="creatrajs", prefix="trajectories", url=connection_string)
 }
 
@@ -52,7 +54,8 @@ db.upload_trajs <- function(trajs,
                             date,
                             silent=T){
 
-  print(glue("Uploading trajs ({nrow(trajs)} rows) for {location_id}"))
+  message(sprintf("[DIAG upload] entry: %s on %s (rows=%d)",
+                  location_id, as.character(date), nrow(trajs)))
   # Check format
   ok <- T
   ok <- ok & is.data.frame(trajs)
@@ -85,6 +88,7 @@ db.upload_trajs <- function(trajs,
   # And then upload
   fs$upload(filepath, name=basename(filepath), content_type=NULL,
             metadata=jsonlite::toJSON(metadata, auto_unbox=T))
+  message(sprintf("[DIAG upload] done: %s on %s", location_id, date))
 }
 
 

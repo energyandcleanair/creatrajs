@@ -53,6 +53,14 @@ trajs.compute <- function(
     if(is.null(use_cache)) use_cache <- T
     if(is.null(save_to_cache)) save_to_cache <- use_cache
 
+    # [DIAG] One-line summary that should always reach Cloud Logging even with rate limiting.
+    message(sprintf(
+      "[DIAG trajs.compute] use_cache=%s save_to_cache=%s mongo_url_len=%d mongolite_avail=%s",
+      use_cache, save_to_cache,
+      nchar(Sys.getenv("CREA_MONGODB_URL", "")),
+      requireNamespace("mongolite", quietly = TRUE)
+    ))
+
     # Print all variables of current environment
     if(debug){
       for (obj in ls()) {
@@ -148,6 +156,8 @@ trajs.get <- function(dates,
 
 
   message("Computing trajs for ", unique(location_id), " from ", min(dates), " to ", max(dates))
+  message(sprintf("[DIAG trajs.get] location_id=%s use_cache=%s save_to_cache=%s",
+                  unique(location_id), use_cache, save_to_cache))
 
   # Check that libgfortran is installed (and others?)
   check_configuration()
@@ -265,6 +275,9 @@ trajs.get <- function(dates,
                         height=height,
                         hours=hours
                         )
+      } else {
+        message(sprintf("[DIAG upload] SKIPPED (save_to_cache=FALSE) for %s on %s",
+                        location_id, as.character(date)))
       }
 
       return(t)
@@ -335,11 +348,20 @@ trajs.get <- function(dates,
     debug=debug,
     SIMPLIFY=F)
 
+
   if(complete_only){
     complete <- unlist(lapply(trajs, trajs.is_complete, duration_hour=duration_hour, hours=hours))
     if(length(complete) == 0){
-      return(list())
+      message(sprintf("[DIAG trajs.get] location_id=%s complete_only filter: 0/%d trajectories complete (all dropped)",
+                      unique(location_id), length(dates)))
+      return(rep(list(NA), length(dates)))
     }
+    n_incomplete <- sum(is.na(complete) | !complete)
+    n_complete <- sum(!is.na(complete) & complete)
+    incomplete_dates <- as.character(lubridate::date(dates[is.na(complete) | !complete]))
+    message(sprintf("[DIAG trajs.get] location_id=%s complete_only filter: %d complete, %d incomplete (out of %d). Incomplete dates: %s",
+                    unique(location_id), n_complete, n_incomplete, length(dates),
+                    if(length(incomplete_dates) == 0) "<none>" else paste(incomplete_dates, collapse=",")))
     trajs[is.na(complete) | !complete] <- NA
   }
 
