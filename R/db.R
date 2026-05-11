@@ -52,6 +52,7 @@ db.upload_trajs <- function(trajs,
                             duration_hour,
                             hours,
                             date,
+                            timezone=NULL,
                             silent=T){
 
   message(sprintf("[DIAG upload] entry: %s on %s (rows=%d)",
@@ -68,6 +69,7 @@ db.upload_trajs <- function(trajs,
 
   hours <- if(all(is.null(hours)) || all(is.na(hours))) NULL else {paste0(hours, collapse=',')}
   height <- if(all(is.null(height)) || all(is.na(height))) NULL else {height}
+  timezone <- if(all(is.null(timezone)) || all(is.na(timezone)) || !nzchar(timezone)) NULL else {timezone}
 
   metadata <- list(location_id=location_id,
                    duration_hour=duration_hour,
@@ -75,6 +77,7 @@ db.upload_trajs <- function(trajs,
                    met_type=met_type,
                    date=date,
                    hours=hours,
+                   timezone=timezone,
                    format="rds")
 
   # Remove first if exists

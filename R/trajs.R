@@ -271,7 +271,8 @@ trajs.get <- function(dates,
                         date=date,
                         duration_hour=duration_hour,
                         height=height,
-                        hours=hours
+                        hours=hours,
+                        timezone=timezone
                         )
       } else {
         message(sprintf("[DIAG upload] SKIPPED (save_to_cache=FALSE) for %s on %s",
