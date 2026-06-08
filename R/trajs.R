@@ -598,6 +598,14 @@ resolve_hysplit_binary_path <- function(binary_path=NULL){
   candidate
 }
 
+# Drop stub rows (NA date/lat/lon) that splitr returns when a trajectory fails to
+# compute. An NA datetime breaks pyreadr's POSIXct conversion when the API reads
+# the stored RDS, so these must never be stored.
+trajs.drop_failed_rows <- function(trajs){
+  if(is.null(trajs) || !is.data.frame(trajs) || nrow(trajs) == 0) return(trajs)
+  trajs %>% filter(if_all(any_of(c("traj_dt", "lat", "lon")), ~ !is.na(.x)))
+}
+
 hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timezone="UTC", hours=c(0, 6, 12, 18), binary_path=NULL){
 
   dir_hysplit_met <- path.expand(Sys.getenv("DIR_HYSPLIT_MET", here::here(utils.get_cache_folder("weather"))))
@@ -637,6 +645,8 @@ hysplit.trajs <- function(date, geometry, height, duration_hour, met_type, timez
         }
       }
     )
+
+    trajs <- trajs.drop_failed_rows(trajs)
 
     # Update fields to be compatible with OpenAIR
     trajs$hour.inc <- trajs$hour_along
