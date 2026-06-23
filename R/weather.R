@@ -137,17 +137,21 @@ gdas1_read_header_date <- function(filepath){
   con <- file(filepath, "rb")
   on.exit(close(con), add = TRUE)
   header <- rawToChar(readBin(con, what = "raw", n = 64))
-  header <- gsub("\\s+", " ", trimws(header))
-  tokens <- unlist(strsplit(header, " "))
 
-  if(length(tokens) < 3){
+  # gdas1/ARL files open with a fixed-width index label whose first three
+  # 2-character fields are year, month and day, right-justified and space-padded:
+  #   "26 6 1" -> 2026-06-01,  "26 615" -> 2026-06-15,  "251015" -> 2025-10-15.
+  # Splitting on whitespace silently breaks for any two-digit day or month (e.g.
+  # " 6" + "15" collapses to the single token "615"), which made every run whose
+  # current7days started on day >= 10 return NA and skip the mapping entirely.
+  # Read the fields by fixed position instead.
+  if(nchar(header) < 6){
     return(NA)
   }
-
-  yy <- suppressWarnings(as.integer(tokens[1]))
-  mm <- suppressWarnings(as.integer(tokens[2]))
-  dd <- suppressWarnings(as.integer(tokens[3]))
-  if(any(is.na(c(yy, mm, dd)))){
+  yy <- suppressWarnings(as.integer(trimws(substr(header, 1, 2))))
+  mm <- suppressWarnings(as.integer(trimws(substr(header, 3, 4))))
+  dd <- suppressWarnings(as.integer(trimws(substr(header, 5, 6))))
+  if(any(is.na(c(yy, mm, dd))) || mm < 1 || mm > 12 || dd < 1 || dd > 31){
     return(NA)
   }
 
@@ -169,24 +173,61 @@ gdas1_filename_from_date <- function(d){
   paste0("gdas1.", month_name, year_2digit, ".w", week_number)
 }
 
-gdas1_map_current7days_to_week <- function(dir_hysplit_met){
+# Day-of-month on which a gdas1 weekly file starts, e.g. "gdas1.jun26.w3" -> 15.
+# A real (NOAA-published) weekly file's header date always falls on this day; a
+# current7days copy mapped into the week does not, which lets us tell them apart.
+gdas1_week_start_day <- function(filename){
+  week_n <- suppressWarnings(as.integer(sub(".*\\.w([0-9])$", "\\1", filename)))
+  (week_n - 1L) * 7L + 1L
+}
+
+gdas1_map_current7days_to_week <- function(dir_hysplit_met,
+                                           full_week_min_bytes = gdas1_min_size_mb("gdas1.full.w1") * 2^20){
   current_path <- file.path(dir_hysplit_met, "current7days")
   current_date <- gdas1_read_header_date(current_path)
-  target_file <- gdas1_filename_from_date(current_date)
 
-  if(is.na(current_date) || is.na(target_file)){
+  if(is.na(current_date)){
     return(invisible(NULL))
   }
 
-  target_path <- file.path(dir_hysplit_met, target_file)
-  target_ok <- file.exists(target_path) && file.info(target_path)$size > 0
-  if(target_ok){
-    return(invisible(NULL))
-  }
+  # current7days is a rolling file whose header is its OLDEST day; a full file
+  # spans 7 days and can straddle a week boundary (tail of w3 + start of w4) or
+  # even a month boundary. splitr/HYSPLIT selects met purely by the receptor
+  # date's weekly filename, so current7days is invisible until copied to each
+  # weekly name it covers. During an in-progress week no real weekly file exists
+  # anywhere, so this mapping is the only thing keeping the most recent dates
+  # available. A 7-day window touches at most two week buckets; only reach into
+  # the second when the file is full-size, so a short/partial current7days never
+  # fabricates a weekly file it doesn't fully contain.
+  is_full_week <- file.info(current_path)$size >= full_week_min_bytes
+  last_date <- if(is_full_week) current_date + 6 else current_date
 
-  copied <- file.copy(current_path, target_path, overwrite = TRUE)
-  if(copied){
-    print(glue::glue("Mapped current7days to {target_file} from header date {current_date}"))
+  span_dates <- seq(current_date, last_date, by = "day")
+  target_files <- unique(stats::na.omit(gdas1_filename_from_date(span_dates)))
+
+  for(target_file in target_files){
+    target_path <- file.path(dir_hysplit_met, target_file)
+
+    if(file.exists(target_path) && file.info(target_path)$size > 0){
+      existing_date <- gdas1_read_header_date(target_path)
+      start_day <- gdas1_week_start_day(target_file)
+      # Overwrite only a current7days copy (header off the week start) that is
+      # older than what we now hold. A real weekly file (header == week start),
+      # an equally/fresher copy, or an unreadable file are all left untouched so
+      # we never clobber good data nor freeze the in-progress week behind a stale
+      # copy.
+      is_stale_copy <- !is.na(existing_date) &&
+        as.integer(format(existing_date, "%d")) != start_day &&
+        existing_date < current_date
+      if(!is_stale_copy){
+        next
+      }
+    }
+
+    copied <- file.copy(current_path, target_path, overwrite = TRUE)
+    if(copied){
+      print(glue::glue("Mapped current7days to {target_file} from header date {current_date}"))
+    }
   }
 }
 
