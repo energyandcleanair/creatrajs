@@ -17,7 +17,7 @@ jobs:
 
       - name: Install test dependencies
         shell: Rscript {0}
-        run: install.packages(c("testthat", "dplyr"))
+        run: install.packages(c("testthat", "dplyr", "glue"))
 
       # Runs the resource-free unit tests by sourcing the helpers directly. The
       # full package needs private deps (rcrea), system libs, HYSPLIT and MongoDB,
@@ -27,7 +27,10 @@ jobs:
         run: |
           suppressMessages({library(testthat); library(dplyr)})
           source("R/trajs.R")
-          for (f in c("tests/testthat/test-trajs-drop-failed-rows.R")) {
+          source("R/weather.R")
+          for (f in c("tests/testthat/test-trajs-drop-failed-rows.R",
+                      "tests/testthat/test-weather.R",
+                      "tests/testthat/test-weather-validation.R")) {
             tmp <- tempfile(fileext = ".R")
             writeLines(gsub("creatrajs:::", "", readLines(f)), tmp)
             testthat::test_file(tmp, stop_on_failure = TRUE)

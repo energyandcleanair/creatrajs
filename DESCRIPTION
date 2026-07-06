@@ -1,6 +1,6 @@
 Package: creatrajs
 Title: Compute back trajectories and add active fires.
-Version: 0.0.3
+Version: 0.0.4
 Authors@R: 
     person(given = "Hubert",
            family = "Thieriot",

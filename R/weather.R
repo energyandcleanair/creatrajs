@@ -58,6 +58,68 @@ gdas1_min_size_mb <- function(filename){
   )
 }
 
+#' Maximum number of 3-hourly periods a gdas1 weekly file can hold: 8/day x 7 days.
+GDAS1_MAX_PERIODS <- 56L
+
+#' Byte length of one 3-hourly period, measured from the file itself.
+#'
+#' Each period in a gdas1/ARL file opens with an index record whose variable name
+#' is "INDX"; periods are fixed-length, so the gap between the first two "INDX"
+#' markers is the per-period stride and a valid file's size is an exact multiple
+#' of it. Measuring the stride from the file (rather than hard-coding a byte
+#' count) keeps the check working across NOAA's periodic per-record size growth.
+#' Only the head of the file is scanned. Returns NA when fewer than two index
+#' records are found, so the caller can fall back to the size floor.
+#'
+#' @param filepath path to a gdas1 met file
+#' @param max_scan_bytes cap on leading bytes scanned for index records
+gdas1_period_stride <- function(filepath, max_scan_bytes = 32L * 2^20){
+  size <- file.info(filepath)$size
+  if(is.na(size) || size <= 0){
+    return(NA_real_)
+  }
+  con <- file(filepath, "rb")
+  on.exit(close(con), add = TRUE)
+  raw <- readBin(con, what = "raw", n = as.integer(min(size, max_scan_bytes)))
+  hits <- grepRaw("INDX", raw, all = TRUE, fixed = TRUE)
+  if(length(hits) < 2){
+    return(NA_real_)
+  }
+  as.numeric(hits[[2]] - hits[[1]])
+}
+
+#' Whether a gdas1 file is complete AND structurally sound.
+#'
+#' The size floor alone catches 0-byte / truncated downloads but not the opposite
+#' failure: a resumed/appended download (wget -c onto a stale .part, or onto a
+#' server-side file whose size changed since the partial was written) leaves an
+#' OVER-size file with duplicated, misaligned records that still clears the floor
+#' yet is unreadable by HYSPLIT. On top of the floor, require the size to be an
+#' exact multiple of the measured period stride and to hold no more than a week's
+#' worth of periods. When the stride can't be measured we keep the floor-only
+#' verdict rather than risk deleting a good file we simply couldn't introspect.
+#'
+#' @param filepath path to the gdas1 file
+#' @param filename name used to pick the size threshold (defaults to basename)
+#' @param min_size_mb minimum plausible size in MB; injectable for tests
+gdas1_file_is_valid <- function(filepath,
+                                filename = basename(filepath),
+                                min_size_mb = gdas1_min_size_mb(filename)){
+  if(!file.exists(filepath)){
+    return(FALSE)
+  }
+  size <- file.info(filepath)$size
+  if(is.na(size) || round(size / 2^20) < min_size_mb){
+    return(FALSE)   # missing / 0-byte / truncated
+  }
+  stride <- gdas1_period_stride(filepath)
+  if(is.na(stride) || stride <= 0){
+    return(TRUE)    # can't introspect structure; trust the (satisfied) size floor
+  }
+  n_periods <- size / stride
+  isTRUE(n_periods == round(n_periods) && n_periods >= 1 && n_periods <= GDAS1_MAX_PERIODS)
+}
+
 #' Weekly gdas1 file names needed to cover a set of receptor dates.
 #'
 #' Mirrors splitr:::get_met_gdas1's naming (gdas1.<mon><yy>.w<week>) and span
@@ -80,9 +142,10 @@ gdas1_expected_weekly_files <- function(dates, duration_hour){
 #' per-week symlinks into a year subfolder (e.g. .../archives/gdas1/2026/). When a
 #' top-level symlink is missing, splitr's download fails and leaves a 0-byte file.
 #' The underlying file is still available in the year subfolder, so we fetch it
-#' directly from there. Download to a .part temp file and only move it into place
-#' once it passes the size check, so a failed/partial fetch never overwrites good
-#' data nor leaves another broken file behind.
+#' directly from there. Download fresh to a .part temp file (never resume) and
+#' only move it into place once it passes the completeness + structural check, so
+#' a failed/partial/duplicated fetch never overwrites good data nor leaves another
+#' broken file behind.
 #'
 #' @param dir_hysplit_met directory holding the gdas1 met files
 #' @param dates receptor dates (used to know which weekly files are expected)
@@ -92,9 +155,8 @@ gdas1_backfill_from_year_archive <- function(dir_hysplit_met, dates, duration_ho
 
   for(fn in expected){
     fp <- file.path(dir_hysplit_met, fn)
-    size_mb <- if(file.exists(fp)) file.info(fp)$size / 2^20 else NA_real_
-    if(!is.na(size_mb) && round(size_mb) >= gdas1_min_size_mb(fn)){
-      next # already present and complete
+    if(file.exists(fp) && gdas1_file_is_valid(fp, fn)){
+      next # already present, complete and structurally sound
     }
 
     year <- 2000L + as.integer(sub("^gdas1\\.[a-z]{3}([0-9]{2})\\.w[0-9]$", "\\1", fn))
@@ -104,16 +166,25 @@ gdas1_backfill_from_year_archive <- function(dir_hysplit_met, dates, duration_ho
     url <- sprintf("%s/%d/%s", GDAS1_FTP_DIR, year, fn)
     tmp <- paste0(fp, ".part")
 
+    # Always start from a clean slate. wget -c (resume) was appending onto a
+    # leftover .part -- or onto a server-side file whose size had changed since the
+    # partial was written -- producing an over-size, misaligned file with
+    # duplicated records that clears the size floor yet HYSPLIT can't index.
+    # Remove any partial and download fresh, then validate structure before use.
+    if(file.exists(tmp)){
+      file.remove(tmp)
+    }
+
     print(glue::glue("gdas1 file {fn} missing or incomplete; backfilling from year archive {url}"))
     ok <- tryCatch({
       downloader::download(url = url,
                            destfile = path.expand(tmp),
                            method = "wget",
-                           extra = c("-N -c "),
+                           extra = "",
                            quiet = TRUE,
                            mode = "wb",
                            cacheOK = FALSE)
-      file.exists(tmp) && (file.info(tmp)$size / 2^20) >= gdas1_min_size_mb(fn)
+      gdas1_file_is_valid(tmp, fn)
     }, error = function(e){
       print(e)
       FALSE
@@ -243,12 +314,15 @@ remove_incomplete_gdas1 <- function(){
   infos$size_mb <- infos$size / 2^20
   rownames(infos) <- NULL
 
-  # A file is valid if it reaches the minimum plausible size for its type. Using a
-  # lower bound (rather than an exact byte count) catches 0-byte/truncated downloads
-  # while tolerating NOAA's periodic file-size growth, which previously made every
-  # current full-week file fail an exact "== 571 MB" check and get re-downloaded each run.
+  # A file is valid only if it clears the minimum plausible size for its type AND
+  # is structurally sound. The size floor (a lower bound, not an exact byte count)
+  # catches 0-byte/truncated downloads while tolerating NOAA's periodic file-size
+  # growth, which previously made every current full-week file fail an exact
+  # "== 571 MB" check and get re-downloaded each run. The structural check catches
+  # the opposite failure a lower bound can't see: an over-size, duplicated,
+  # misaligned file left by a resumed download.
   infos <- infos %>%
-    mutate(valid = round(size_mb) >= gdas1_min_size_mb(filename))
+    mutate(valid = mapply(gdas1_file_is_valid, filepath, filename, USE.NAMES = FALSE))
 
   to_remove <- infos %>%
     filter(is.na(valid) | !valid) %>%
