@@ -57,9 +57,11 @@ db.upload_trajs <- function(trajs,
 
   message(sprintf("[DIAG upload] entry: %s on %s (rows=%d)",
                   location_id, as.character(date), nrow(trajs)))
-  # Check format
-  ok <- T
-  ok <- ok & is.data.frame(trajs)
+  if(!is.data.frame(trajs) || nrow(trajs) == 0){
+    warning(sprintf("Refusing to upload an empty trajectory result for %s on %s",
+                    location_id, as.character(date)))
+    return(FALSE)
+  }
 
   fs <- db.get_gridfs()
   tmpdir <- tempdir()
@@ -216,4 +218,3 @@ db.remove_trajs_not <- function(location_id=NULL, hours_not=NULL, duration_hour_
   if(length(to_remove) >0) pbapply::pblapply(to_remove, function(x) fs$remove(paste0("id:", x)))
   print(sprintf("%d row(s) removed", to_remove))
 }
-
