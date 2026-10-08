@@ -258,7 +258,7 @@ trajs.get <- function(dates,
                          binary_path=binary_path
       )
 
-      if(length(t)==0 || (length(t)==1 && is.na(t))){
+      if(trajs.is_empty_result(t)){
         message("No trajectories computed for ", location_id, " on ", date)
         return(NA)
       }
@@ -598,6 +598,16 @@ resolve_hysplit_binary_path <- function(binary_path=NULL){
   candidate
 }
 
+# Treat every no-result shape returned by HYSPLIT as a failed computation. In
+# particular, a data frame can have columns (and therefore non-zero length) but
+# zero rows. Uploading that frame replaces a previously good cached trajectory.
+trajs.is_empty_result <- function(trajs){
+  is.null(trajs) ||
+    (is.data.frame(trajs) && nrow(trajs) == 0) ||
+    (length(trajs) == 0) ||
+    (length(trajs) == 1 && isTRUE(is.na(trajs)))
+}
+
 # Drop stub rows (NA date/lat/lon) that splitr returns when a trajectory fails to
 # compute. An NA datetime breaks pyreadr's POSIXct conversion when the API reads
 # the stored RDS, so these must never be stored.
@@ -782,4 +792,3 @@ trajs.oriented_extent <- function(geometry, duration_hour, ws, wd, width_deg=90,
     return(NA)
   })
 }
-
