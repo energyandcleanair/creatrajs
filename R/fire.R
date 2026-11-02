@@ -2,8 +2,9 @@ fire.filename_to_date <- function(f){
   as.POSIXct(gsub(".*([0-9]{7})\\.(txt|csv)","\\1", f), format="%Y%j")
 }
 
-# Suomi NPP stopped delivering data on 2 Nov 2026: active fires come from NOAA-20 from this date on.
-FIRMS_NOAA20_FROM <- as.Date("2026-11-01")
+# Active fires come from Suomi NPP until NOAA-20 data starts, and from NOAA-20 afterwards
+# (Suomi NPP stopped delivering on 2 Nov 2026). Same switch as the API's VIIRS-1km-crea-derived-v1.
+FIRMS_NOAA20_FROM <- as.Date("2018-01-05")
 
 # FIRMS NRT folder of each satellite, and its daily file name before the region and date
 FIRMS_SATELLITES <- c(
@@ -97,7 +98,7 @@ fire.read <- function(date_from=NULL,
                       parallel=T,
                       mc.cores=max(parallel::detectCores()-1,1)){
 
-  # Each date is read from one satellite: Suomi NPP before FIRMS_NOAA20_FROM, NOAA-20 afterwards
+  # Each date is read from one satellite: Suomi NPP before FIRMS_NOAA20_FROM, NOAA-20 from then on
   files <- unlist(lapply(names(FIRMS_SATELLITES), function(satellite){
     d <- utils.get_firms_subfolder(region=region, satellite=satellite)
     files_nrt <- list.files(d, paste0(sprintf(FIRMS_SATELLITES[[satellite]], region), "(\\d*).txt"), full.names = T) #TODO Further filtering
