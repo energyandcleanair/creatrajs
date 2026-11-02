@@ -2,6 +2,24 @@ fire.filename_to_date <- function(f){
   as.POSIXct(gsub(".*([0-9]{7})\\.(txt|csv)","\\1", f), format="%Y%j")
 }
 
+# Active fires come from Suomi NPP until the FIRMS NOAA-20 archive starts (1 Apr 2018), and from
+# NOAA-20 afterwards (Suomi NPP stopped delivering on 2 Nov 2026).
+FIRMS_NOAA20_FROM <- as.Date("2018-04-01")
+
+# FIRMS NRT folder of each satellite, and its daily file name before the region and date
+FIRMS_SATELLITES <- c(
+  "suomi-npp-viirs-c2" = "SUOMI_VIIRS_C2_%s_VNP14IMGTDL_NRT_",
+  "noaa-20-viirs-c2" = "J1_VIIRS_C2_%s_VJ114IMGTDL_NRT_"
+)
+
+fire.satellite_for_date <- function(dates){
+  ifelse(lubridate::date(dates) < FIRMS_NOAA20_FROM, "suomi-npp-viirs-c2", "noaa-20-viirs-c2")
+}
+
+fire.nrt_filename <- function(satellite, region, dates){
+  paste0(sprintf(FIRMS_SATELLITES[[satellite]], region), format(lubridate::date(dates), "%Y%j"), ".txt")
+}
+
 
 #' Download active fire data into local folder
 #'
@@ -14,10 +32,6 @@ fire.filename_to_date <- function(f){
 #'
 #' @examples
 fire.download <- function(date_from=NULL, date_to=NULL, region="Global"){
-  d <- file.path(utils.get_firms_folder(),
-                 "suomi-npp-viirs-c2",
-                 region)
-  dir.create(d, showWarnings = F, recursive = T)
 
   # No date can happen if all trajectories failed
   # Yet shouldn't stop here
@@ -30,33 +44,34 @@ fire.download <- function(date_from=NULL, date_to=NULL, region="Global"){
   date_from <- max(lubridate::date(date_from), lubridate::today()-lubridate::days(60))
 
   if(date_to >= date_from){
-    files.all <- paste0("SUOMI_VIIRS_C2_",
-                        region,
-                        "_VNP14IMGTDL_NRT_",
-                        as.POSIXct(seq(lubridate::date(date_from),
-                                       lubridate::date(date_to),
-                                       by="day")) %>% strftime("%Y%j"),
-                        ".txt")
-
-    # Even though wget can manage already downloaded files,
-    # this is faster and less verbose in console
-    files.existing <- list.files(d, "*.txt")
-    date.existing <- fire.filename_to_date(files.existing)
-
-    date.all <- fire.filename_to_date(files.all)
-
-    file.todownload <- files.all[which(!date.all %in% date.existing)]
+    dates <- seq(lubridate::date(date_from), lubridate::date(date_to), by="day")
+    satellites <- fire.satellite_for_date(dates)
 
     # To generate EOSDIS Token: https://nrt3.modaps.eosdis.nasa.gov/profile/app-keys
     eosdis_token <- Sys.getenv("EOSDIS_TOKEN")
-    for(f in file.todownload){
-      tryCatch({
-        cmd <- paste0("wget -e robots=off -nc -np -R .html,.tmp -nH --cut-dirs=5 \"https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/suomi-npp-viirs-c2/", region, "/", f,"\" --header \"Authorization: Bearer ",
-                      eosdis_token,
-                      "\" -P ",
-                      d)
-        system(cmd)
-      }, error=function(e) print(e))
+    for(satellite in unique(satellites)){
+      d <- utils.get_firms_subfolder(region=region, satellite=satellite)
+      dir.create(d, showWarnings = F, recursive = T)
+      files.all <- fire.nrt_filename(satellite, region, dates[satellites == satellite])
+
+      # Even though wget can manage already downloaded files,
+      # this is faster and less verbose in console
+      files.existing <- list.files(d, "*.txt")
+      date.existing <- fire.filename_to_date(files.existing)
+
+      date.all <- fire.filename_to_date(files.all)
+
+      file.todownload <- files.all[which(!date.all %in% date.existing)]
+
+      for(f in file.todownload){
+        tryCatch({
+          cmd <- paste0("wget -e robots=off -nc -np -R .html,.tmp -nH --cut-dirs=5 \"https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/", satellite, "/", region, "/", f,"\" --header \"Authorization: Bearer ",
+                        eosdis_token,
+                        "\" -P ",
+                        d)
+          system(cmd)
+        }, error=function(e) print(e))
+      }
     }
   }
 }
@@ -83,11 +98,14 @@ fire.read <- function(date_from=NULL,
                       parallel=T,
                       mc.cores=max(parallel::detectCores()-1,1)){
 
-  d <- utils.get_firms_subfolder(region=region)
-
-  files_nrt <- list.files(d, paste0("SUOMI_VIIRS_C2_",region,"_VNP14IMGTDL_NRT_(\\d*).txt"), full.names = T) #TODO Further filtering
-  files_archive <- list.files(d, "fire_.*[0-9]{7}.txt", full.names = T)
-  files <- c(files_nrt, files_archive)
+  # Each date is read from one satellite: Suomi NPP before FIRMS_NOAA20_FROM, NOAA-20 from then on
+  files <- unlist(lapply(names(FIRMS_SATELLITES), function(satellite){
+    d <- utils.get_firms_subfolder(region=region, satellite=satellite)
+    files_nrt <- list.files(d, paste0(sprintf(FIRMS_SATELLITES[[satellite]], region), "(\\d*).txt"), full.names = T) #TODO Further filtering
+    files_archive <- list.files(d, "fire_.*[0-9]{7}.txt", full.names = T)
+    files_satellite <- c(files_nrt, files_archive)
+    files_satellite[fire.satellite_for_date(fire.filename_to_date(files_satellite)) == satellite]
+  }))
 
   f_min_date <- function(f, date_from, date_to){
     # ifelse(
@@ -182,19 +200,18 @@ fire.read <- function(date_from=NULL,
 #'
 #' @param file_archive
 #' @param region
+#' @param satellite FIRMS folder of the satellite the archive comes from, e.g. "noaa-20-viirs-c2"
 #'
 #' @returns
 #' @export
 #'
 #' @examples
-fire.split_archive <- function(file_archive, region="Global"){
+fire.split_archive <- function(file_archive, region="Global", satellite="suomi-npp-viirs-c2"){
 
   f <- readr::read_csv(file_archive)
   fs <- split(f, f$acq_date)
 
-  folder <- file.path(utils.get_firms_folder(),
-                 "suomi-npp-viirs-c2",
-                 region)
+  folder <- utils.get_firms_subfolder(region=region, satellite=satellite)
 
   lapply(fs, function(f){
     date <- unique(f$acq_date)
