@@ -56,14 +56,15 @@ utils.get_firms_folder <- function(){
 #' Region subfolder of Firms folder
 #'
 #' @param region
+#' @param satellite FIRMS folder of the satellite, "suomi-npp-viirs-c2" or "noaa-20-viirs-c2"
 #'
 #' @return
 #' @export
 #'
 #' @examples
-utils.get_firms_subfolder <- function(region="Global"){
+utils.get_firms_subfolder <- function(region="Global", satellite="suomi-npp-viirs-c2"){
   d <- utils.get_firms_folder()
-  return(file.path(d, "suomi-npp-viirs-c2", region))
+  return(file.path(d, satellite, region))
 }
 
 
