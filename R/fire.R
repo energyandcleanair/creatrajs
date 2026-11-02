@@ -2,9 +2,9 @@ fire.filename_to_date <- function(f){
   as.POSIXct(gsub(".*([0-9]{7})\\.(txt|csv)","\\1", f), format="%Y%j")
 }
 
-# Active fires come from Suomi NPP until NOAA-20 data starts, and from NOAA-20 afterwards
-# (Suomi NPP stopped delivering on 2 Nov 2026). Same switch as the API's VIIRS-1km-crea-derived-v1.
-FIRMS_NOAA20_FROM <- as.Date("2018-01-05")
+# Active fires come from Suomi NPP until the FIRMS NOAA-20 archive starts (1 Apr 2018), and from
+# NOAA-20 afterwards (Suomi NPP stopped delivering on 2 Nov 2026).
+FIRMS_NOAA20_FROM <- as.Date("2018-04-01")
 
 # FIRMS NRT folder of each satellite, and its daily file name before the region and date
 FIRMS_SATELLITES <- c(
